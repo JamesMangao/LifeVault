@@ -1,7 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read/write their own private data
+    // Allow users to read/write their own settings
+    match /settings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Rules for the 'users' collection.
+    // This rule allows any authenticated user to read the top-level user document (the profile).
+    // It restricts writes to the user who owns the document.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // This rule ensures all documents in all subcollections under a user are private.
+    // Only the owner can read or write to them.
     match /users/{userId}/{documents=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }

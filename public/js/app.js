@@ -3,21 +3,20 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
-         query, orderBy, limit, where, arrayUnion, arrayRemove, increment, serverTimestamp, onSnapshot, Timestamp }
+         query, orderBy, limit, where, arrayUnion, arrayRemove, increment, serverTimestamp, onSnapshot, Timestamp, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBtFg4Sz4b1ju9CZNOqwbM7KTLIZNk7Ask",
-  authDomain: "lifevault-77666.firebaseapp.com",
-  projectId: "lifevault-77666",
-  storageBucket: "lifevault-77666.firebasestorage.app",
-  messagingSenderId: "295717552080",
-  appId: "1:295717552080:web:1783772c220100f14943d5",
-  measurementId: "G-RLKQDJXTMB"
-};
-const fbApp = initializeApp(firebaseConfig);
-const auth  = getAuth(fbApp);
-const db    = getFirestore(fbApp);
+// Make Firebase instances globally available
+let auth, db;
+
+// Initialize Firebase
+const fbApp = initializeApp(window.firebaseConfig);
+auth = getAuth(fbApp);
+db = getFirestore(fbApp);
+
+window.auth = auth;
+window.db = db;
+window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch };
 
 let currentUser = null;
 let journals = [], tasks = [], goals = [];
@@ -86,7 +85,12 @@ window.addEventListener('load', () => {
   setTimeout(() => {
     document.getElementById('loading').classList.add('hidden');
     onAuthStateChanged(auth, user => {
-      if (user) { currentUser = user; showApp(user); loadAll(); }
+      if (user) {
+        currentUser = user;
+        window.currentUser = user; // Expose for debugging
+        showApp(user);
+        loadAll();
+      }
       else showAuth();
     });
     // Fallback if auth never fires
@@ -111,8 +115,35 @@ function showApp(user) {
   document.getElementById('user-avatar').src = av;
   document.getElementById('composer-avatar').src = av;
   updateGreeting();
+  ensureUserProfileExists(user); // Ensure a user profile document exists
   loadUserProfile();
   restoreLastPage(); // Restore last page on app load
+}
+
+async function ensureUserProfileExists(user) {
+  if (!user) return;
+  const userRef = doc(db, 'users', user.uid);
+  try {
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      // User document doesn't exist, so create it
+      console.log(`[Debug] User profile for ${user.uid} not found. Creating one.`);
+      await setDoc(userRef, {
+        displayName: user.displayName || 'Anonymous',
+        email: user.email,
+        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName||'U')}&background=4f8ef7&color=fff`,
+        username: (user.displayName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user',
+        bio: 'Just joined LifeVault!',
+        isPublic: true,
+        joinedAt: serverTimestamp()
+      });
+      console.log(`[Debug] User profile created for ${user.uid}.`);
+    } else {
+      console.log(`[Debug] User profile for ${user.uid} already exists.`);
+    }
+  } catch (error) {
+    console.error("Error ensuring user profile exists:", error);
+  }
 }
 
 /* ══ AUTH ════════════════════════════════════════════════════ */
@@ -139,6 +170,15 @@ async function loadAll() {
     journals = j.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     tasks    = t.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     goals    = g.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
+
+    // Expose for debugging
+    window.journals = journals;
+    window.tasks = tasks;
+    window.goals = goals;
+
+    // Subscribe to community feed so posts are available on all pages
+    subscribeFeed();
+    
     renderAll();
   } catch(e) { toast('Load error: '+e.message,'❌'); }
 }
@@ -162,6 +202,8 @@ window.navigateTo = (page, event) => {
   if (page === 'insights')   renderInsights();
   if (page === 'community')  { subscribeFeed(); document.getElementById('new-posts-dot').style.display='none'; }
   if (page === 'profile')    renderProfilePage();
+  if (page === 'settings')   window.renderSettingsPage();
+  if (page === 'shadow-self' || page === 'life-story') initializeLearningResources();
 };
 
 function restoreLastPage() {
@@ -225,6 +267,53 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && expandedJournalId) closeExpandedJournal();
 });
 
+/* ══ DELEGATED LISTENERS ═════════════════════════════════════ */
+function initExpandableCards(container) {
+  if (!container) return;
+  container.onclick = e => {
+    // Photo clicks
+    const photoEl = e.target.closest('[data-photo]');
+    if (photoEl) { e.stopPropagation(); viewPhoto(photoEl.dataset.photo); return; }
+
+    // Action button clicks — stop propagation so they don't trigger expand
+    const shareBtn = e.target.closest('[data-share]');
+    if (shareBtn) { e.stopPropagation(); shareJournal(shareBtn.dataset.share); return; }
+
+    const editBtn = e.target.closest('[data-edit]');
+    if (editBtn) { e.stopPropagation(); openJournalModal(editBtn.dataset.edit); return; }
+
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) { e.stopPropagation(); delJournal(delBtn.dataset.del); return; }
+
+    // Community Post actions - these will only work if data-* attributes are added to post cards
+    const likeBtn = e.target.closest('[data-like]');
+    if (likeBtn) { e.stopPropagation(); toggleLike(likeBtn.dataset.like); return; }
+
+    const userBtn = e.target.closest('[data-user]');
+    if (userBtn) { e.stopPropagation(); openUserProfileModal(userBtn.dataset.user); return; }
+
+    // Expand — clicking anywhere on the card that isn't a button
+    const entryEl = e.target.closest('.journal-entry, .post-card');
+    if (entryEl) {
+      // For journals, toggle preview. For posts, open expanded view.
+      if (entryEl.classList.contains('journal-entry')) {
+        const preview = entryEl.querySelector('.entry-preview');
+        if (preview) preview.classList.toggle('expanded');
+      } else if (entryEl.classList.contains('post-card')) {
+        const postId = entryEl.getAttribute('data-expand') || entryEl.getAttribute('data-post-id');
+        if (postId) {
+          // Use the profile page's expanded post handler if available
+          if (typeof window._profileOpenExpandedPost === 'function') {
+            window._profileOpenExpandedPost(postId);
+          } else if (typeof window.openExpandedPost === 'function') {
+            window.openExpandedPost(postId);
+          }
+        }
+      }
+    }
+  };
+}
+
 /* ══ RENDER JOURNALS — template literals, data-id delegation ══ */
 function renderJournals(containerId, maxCount, isDash) {
   const container = document.getElementById(containerId);
@@ -274,26 +363,7 @@ function renderJournals(containerId, maxCount, isDash) {
     </div>`;
   }).join('');
 
-  // ── Delegated click handler — ONE listener on the container ──
-  container.onclick = e => {
-    // Photo clicks
-    const photoEl = e.target.closest('[data-photo]');
-    if (photoEl) { e.stopPropagation(); viewPhoto(photoEl.dataset.photo); return; }
-
-    // Action button clicks — stop propagation so they don't trigger expand
-    const shareBtn = e.target.closest('[data-share]');
-    if (shareBtn) { e.stopPropagation(); shareJournal(shareBtn.dataset.share); return; }
-
-    const editBtn = e.target.closest('[data-edit]');
-    if (editBtn) { e.stopPropagation(); openJournalModal(editBtn.dataset.edit); return; }
-
-    const delBtn = e.target.closest('[data-del]');
-    if (delBtn) { e.stopPropagation(); delJournal(delBtn.dataset.del); return; }
-
-    // Expand — clicking anywhere on the card that isn't a button
-    const entryEl = e.target.closest('[data-expand]');
-    if (entryEl) { openExpandedJournal(entryEl.dataset.expand); }
-  };
+  initExpandableCards(container);
 }
 
 window.selectMood = (val, emoji) => {
@@ -714,6 +784,7 @@ function subscribeFeed() {
   const q = query(collection(db,'community_posts'), orderBy('createdAt','desc'), limit(60));
   feedUnsubscribe = onSnapshot(q, snap => {
     feedPosts = snap.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
+    window.feedPosts = feedPosts; // Expose for debugging
     renderFeed();
     updateCommStats();
     const activePage = document.querySelector('.page.active')?.id;
@@ -797,6 +868,7 @@ window.openShareModal = (type = 'journal') => {
 };
 
 window.shareJournal = async id => {
+  if (!currentUser) { toast('Please wait, user not ready.','⏳'); return; }
   const e = journals.find(j=>j.id===id); if (!e) return;
   closeModal('share-modal');
   try {
@@ -852,6 +924,11 @@ function renderFeed() {
     return;
   }
   container.innerHTML = posts.map(p => renderPostCard(p)).join('');
+
+  // The new delegated handler will not work for post actions (like, comment, etc.)
+  // because renderPostCard uses inline onclicks, not data-* attributes.
+  // The handler is set up to ignore these buttons and only handle expansion.
+  initExpandableCards(container);
 }
 
 function renderPostCard(p) {
@@ -876,10 +953,10 @@ function renderPostCard(p) {
       ${p.body ? `<div class="post-body">${esc(p.body)}</div>` : ''}`;
   } else {
     const isLong = (p.body||'').length > 300;
-    typeHtml = `<div class="post-body" id="post-body-${p.id}">${esc(p.body||'')}</div>
-      ${isLong ? `<span class="post-read-more" onclick="toggleReadMore('${p.id}')">Read more ↓</span>` : ''}
+    typeHtml = `<div class="post-body" id="post-body-${p.id}" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${esc(p.body||'')}</div>
+      ${isLong ? `<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${p.id}')" style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block">Read more ↓</span>` : ''}
       ${p.moodEmoji ? `<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>` : ''}
-      ${p.photoUrls?.length ? `<div class="post-photos">${p.photoUrls.map(u=>`<img src="${u}" class="post-photo" onclick="viewPhoto('${u}')">`).join('')}</div>` : ''}
+      ${p.photoUrls?.length ? `<div class="post-photos">${p.photoUrls.map(u=>`<img src="${u}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${u}')">`).join('')}</div>` : ''}
       ${p.tags?.length ? `<div class="post-tags">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>` : ''}`;
   }
 
@@ -887,7 +964,7 @@ function renderPostCard(p) {
     <div class="post-header">
       <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
       <div class="post-meta">
-        <div class="post-author">${esc(p.authorName||'Anonymous')} <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}</div>
+        <button class="post-author-btn" onclick="openUserProfileModal('${p.authorId}')">${esc(p.authorName||'Anonymous')}</button> <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}
         <div class="post-time">${timeAgo}</div>
       </div>
       ${isOwn?`<button class="post-delete-btn" onclick="deletePost('${p.id}')">🗑️</button>`:''}
@@ -914,8 +991,16 @@ window.toggleReadMore = id => {
   const el = document.getElementById('post-body-'+id);
   const btn = el?.nextElementSibling;
   if (!el||!btn) return;
-  el.classList.toggle('expanded');
-  btn.textContent = el.classList.contains('expanded') ? 'Show less ↑' : 'Read more ↓';
+  const isExpanded = el.style.webkitLineClamp === 'unset';
+  if (isExpanded) {
+    el.style.webkitLineClamp = '4';
+    el.style.overflow = 'hidden';
+    btn.textContent = 'Read more ↓';
+  } else {
+    el.style.webkitLineClamp = 'unset';
+    el.style.overflow = 'visible';
+    btn.textContent = 'Show less ↑';
+  }
 };
 
 window.toggleLike = async postId => {
@@ -1089,12 +1174,21 @@ function applyProfileToUI() {
 
 function renderProfilePage() {
   applyProfileToUI();
-  const myPosts = feedPosts.filter(p=>p.authorId===currentUser?.uid);
+
   const postsEl = document.getElementById('profile-my-posts');
-  if (postsEl) {
+  if (!postsEl) return;
+
+  // Check privacy setting from the pre-loaded userProfile object. Default to public.
+  const isPublic = userProfile.isPublic !== false;
+
+  if (isPublic) {
+    const myPosts = feedPosts.filter(p => p.authorId === currentUser?.uid);
     postsEl.innerHTML = myPosts.length
-      ? myPosts.map(p=>renderPostCard(p)).join('')
+      ? myPosts.map(p => renderPostCard(p)).join('')
       : `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🌐</div><div class="empty-title">No posts yet</div><div class="empty-sub">Share something with the community!</div><button class="btn btn-primary" style="margin-top:16px" onclick="navigate('community')">Go to Community</button></div>`;
+  } else {
+    // If profile is private, show a message instead of the posts.
+    postsEl.innerHTML = `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🔒</div><div class="empty-title">This Profile is Private</div><div class="empty-sub">This user's activity is not shared publicly.</div></div>`;
   }
 }
 
@@ -1253,6 +1347,46 @@ window.saveCover = async () => {
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
+/* ══════════════════════════════════════════════════════════════
+   SETTINGS PAGE HANDLERS
+══════════════════════════════════════════════════════════════ */
+// NOTE: These are placeholder handlers for a potential future settings page.
+// Much of this functionality is already implemented in the Profile page modals.
+
+window.renderSettingsPage = () => {
+    console.log("Rendering settings page...");
+    // This is a placeholder. A real implementation would populate
+    // form fields on a dedicated #page-settings element.
+};
+
+// Corresponds to existing saveProfile()
+window.saveProfileSettings = async () => {
+    alert('Profile settings saved! (Placeholder)');
+    // In a real implementation, this would read from settings page inputs
+    // and call setUserProfile().
+};
+
+// Corresponds to existing saveAvatar() and saveCover()
+window.saveAppearanceSettings = () => {
+    alert('Appearance settings saved! (Placeholder)');
+};
+
+// Corresponds to existing exportAsJSON()
+window.exportUserData = () => {
+    exportAsJSON();
+};
+
+// New functionality: Account deletion
+window.deleteUserData = () => {
+    if (!confirm('Are you absolutely sure you want to delete your account and all data? This action cannot be undone.')) {
+        return;
+    }
+    // DANGER: This is a placeholder. A real implementation would require a
+    // secure, multi-step process, likely involving a backend function
+    // to delete all user data from Firestore and then delete the auth user.
+    alert('Your account is being deleted. You will be logged out. (Placeholder)');
+};
+
 /* ══ IMAGE COMPRESSION ════════════════════════════════════════ */
 function compressImageTo(file, targetBytes) {
   return new Promise((resolve, reject) => {
@@ -1288,6 +1422,99 @@ window.closeModal = id => document.getElementById(id).classList.remove('open');
 document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => {
   if (e.target === m) m.classList.remove('open');
 }));
+
+window.openUserProfileModal = async (userId) => {
+  console.log('[Debug] openUserProfileModal called for userId:', userId);
+  if (!userId) {
+    console.log('[Debug] No userId provided, returning.');
+    return;
+  }
+  const modal = document.getElementById('user-profile-modal');
+  if (!modal) {
+    console.log('[Debug] user-profile-modal element not found, returning.');
+    return;
+  }
+
+  // Reset and show loading state
+  modal.classList.add('open');
+  document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div>';
+  document.getElementById('upm-name').textContent = 'Loading...';
+  document.getElementById('upm-username').textContent = '';
+  document.getElementById('upm-bio').textContent = '';
+  document.getElementById('upm-avatar').src = '';
+  document.getElementById('upm-cover').style.background = '';
+  document.getElementById('upm-stat-posts').textContent = '—';
+  document.getElementById('upm-stat-likes').textContent = '—';
+  document.getElementById('upm-stat-joined').textContent = '—';
+
+  try {
+    console.log(`[Debug] Fetching user document: users/${userId}`);
+    const userSnap = await getDoc(doc(db, 'users', userId));
+
+    if (!userSnap.exists()) {
+      console.log('[Debug] User document does not exist.');
+      document.getElementById('upm-name').textContent = 'User Not Found';
+      document.getElementById('upm-username').textContent = `@unknown_user`;
+      document.getElementById('upm-bio').textContent = 'This user profile could not be loaded. The user may have been deleted.';
+      document.getElementById('upm-avatar').src = 'https://ui-avatars.com/api/?name=?&background=374151&color=fff';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🤷‍♂️</div>';
+      return;
+    }
+
+    const userProfile = userSnap.data();
+    console.log('[Debug] User profile data fetched:', userProfile);
+
+    // Assume public profile data is stored directly on the user document
+    const isPublic = userProfile.isPublic !== false;
+    console.log('[Debug] Is profile public?', isPublic);
+
+    if (!isPublic) {
+      document.getElementById('upm-name').textContent = 'Profile is Private';
+      document.getElementById('upm-bio').textContent = 'This user prefers to keep things private.';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🔒</div>';
+      return;
+    }
+
+    // Populate modal with user data
+    document.getElementById('upm-name').textContent = userProfile.displayName || 'Anonymous';
+    document.getElementById('upm-username').textContent = userProfile.username ? `@${userProfile.username}` : '';
+    document.getElementById('upm-bio').textContent = userProfile.bio || 'No bio yet.';
+    document.getElementById('upm-avatar').src = userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.displayName||'U')}&background=4f8ef7&color=fff`;
+    document.getElementById('upm-cover').style.background = userProfile.coverGradient || 'linear-gradient(135deg, #0d1b2a, #1b3a5c)';
+    document.getElementById('upm-stat-joined').textContent = userProfile.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('en-us', { month: 'short', year: 'numeric' }) : '—';
+
+    // Load user's posts and stats
+    const postsQuery = query(collection(db, 'community_posts'), where('authorId', '==', userId), orderBy('createdAt', 'desc'), limit(10));
+    const postsSnap = await getDocs(postsQuery);
+    const userPosts = postsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    document.getElementById('upm-stat-posts').textContent = userPosts.length;
+    const totalLikes = userPosts.reduce((acc, post) => acc + (post.likes?.length || 0), 0);
+    document.getElementById('upm-stat-likes').textContent = totalLikes;
+
+    const postsListEl = document.getElementById('upm-posts-list');
+    if (userPosts.length === 0) {
+      postsListEl.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No recent posts.</div>';
+    } else {
+      postsListEl.innerHTML = userPosts.map(p => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <a href="#" onclick="event.preventDefault(); closeUserProfileModal(); openExpandedPost('${p.id}');" style="color:var(--text);text-decoration:none;font-weight:600">${esc(p.title || p.body.substring(0, 50) + '...')}</a>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:3px">${relativeTime(p.createdAt)}</div>
+        </div>
+      `).join('');
+    }
+
+  } catch (error) {
+    console.error("Error loading user profile:", error);
+    console.log('[Debug] An error occurred in openUserProfileModal:', error);
+    document.getElementById('upm-name').textContent = 'Error loading profile';
+  }
+};
+
+window.closeUserProfileModal = () => {
+  const modal = document.getElementById('user-profile-modal');
+  if (modal) modal.classList.remove('open');
+};
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1302,3 +1529,334 @@ window.toast = (msg, icon='✨') => {
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => { t.classList.add('out'); setTimeout(()=>t.remove(), 300); }, 3000);
 };
+
+// ─── GLOBAL EXPANDED POST HANDLER ─────────────────────────
+window.openExpandedPost = function(postId) {
+  if(!postId || !window.feedPosts) return;
+  const p = window.feedPosts.find(x => x.id === postId);
+  if(!p) return;
+
+  window._expandedPostId = postId;
+  const cu = window.currentUser;
+  const isOwn = p.authorId === cu?.uid;
+  const liked = (p.likes||[]).includes(cu?.uid);
+
+  // Type badges (from main JS)
+  const TYPE_BADGES = {thought:'💭 Thought',journal:'📓 Journal',task:'✅ Task',goal:'🎯 Goal'};
+  const TYPE_BADGE_CLASS = {thought:'badge-journal',journal:'badge-journal',task:'badge-task',goal:'badge-goal'};
+  const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
+
+  // Try profile page overlay first, then community page overlay
+  const profileOverlay = document.getElementById('post-expand-overlay');
+  const communityOverlay = document.getElementById('post-expand-overlay-comm');
+  const overlay = profileOverlay || communityOverlay;
+  const prefix = profileOverlay ? 'pexp' : 'exp';
+
+  if(!overlay) return; // No overlay available
+
+  // Set up header
+  const avatarEl = document.getElementById(prefix + '-avatar');
+  const timeEl = document.getElementById(prefix + '-time');
+  const authorEl = document.getElementById(prefix + '-author-row');
+  
+  if(avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
+  if(timeEl) timeEl.textContent = new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year: new Date(p.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined});
+  
+  if(authorEl) {
+    const handleFromPost = p.authorUsername || (p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user';
+    authorEl.innerHTML = `
+      <button class="post-author-btn"
+              onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
+              style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;
+                     display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .2s"
+              onmouseover="this.style.color='var(--accent)'"
+              onmouseout="this.style.color=''">
+        <span style="font-size:.82rem;font-weight:700;color:var(--text)">${esc(p.authorName||'Anonymous')}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">@${esc(handleFromPost)}</span>
+      </button>
+      <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>
+      ${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>` : ''}`;
+  }
+
+  // Build body HTML
+  let bodyHtml = '';
+  if(p.title) bodyHtml += `<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3">${esc(p.title)}</div>`;
+
+  if(p.type === 'goal'){
+    bodyHtml += `<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px">
+      <div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${p.progress||0}%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px">
+      <span>${p.categoryIcon||'🎯'} ${esc(p.title||'')}</span><span>${p.progress||0}% complete</span>
+    </div>
+    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
+  } else if(p.type === 'task'){
+    bodyHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span>${p.priorityIcon||'✅'}</span>
+      <span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>
+      ${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}
+    </div>
+    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
+  } else {
+    if(p.moodEmoji) bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`;
+    bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.85;color:rgba(232,234,240,.85);font-weight:300;white-space:pre-wrap;word-break:break-word">${esc(p.body||'')}</div>`;
+    if(p.photoUrls?.length) bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${p.photoUrls.map(u=>`<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`;
+    if(p.tags?.length) bodyHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`;
+  }
+
+  // Comments section
+  const myAvatar = cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
+  bodyHtml += `<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+    <div id="${prefix}-comments-list" style="margin-bottom:12px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div>
+    </div>
+    <div class="comment-input-row">
+      <img src="${esc(myAvatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
+      <input class="comment-input" id="${prefix}-comment-input" placeholder="Write a comment…"
+             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
+      <button class="comment-submit" onclick="window._submitCommentGlobal('${postId}')">↵</button>
+    </div>
+  </div>`;
+
+  const bodyEl = document.getElementById(prefix + '-body');
+  if(bodyEl) bodyEl.innerHTML = bodyHtml;
+
+  // Footer with actions
+  const footerEl = document.getElementById(prefix + '-footer');
+  if(footerEl) {
+    footerEl.innerHTML = `
+      <button class="post-action-btn ${liked?'liked':''}" id="${prefix}-like-btn"
+              onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
+        <span class="heart-icon">${liked?'❤️':'🤍'}</span>
+        <span id="${prefix}-like-count" class="post-action-count">${(p.likes||[]).length||''}</span>
+      </button>
+      <button class="post-action-btn" onclick="event.stopPropagation();repost('${postId}')">
+        🔁 <span class="post-action-count">${p.repostCount||''}</span>
+      </button>
+      ${isOwn ? `<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>` : ''}`;
+  }
+
+  // Show overlay
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Load comments
+  window._loadCommentsGlobal(postId);
+};
+
+window.closeExpandedPost = function() {
+  const profileOverlay = document.getElementById('post-expand-overlay');
+  const communityOverlay = document.getElementById('post-expand-overlay-comm');
+  const overlay = profileOverlay || communityOverlay;
+  if(overlay) overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  window._expandedPostId = null;
+};
+
+// Global comment helpers
+window._submitCommentGlobal = async function(postId) {
+  const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
+  const input = document.getElementById(prefix + '-comment-input');
+  const text = input.value.trim();
+  if(!text) return;
+
+  const user = window.auth.currentUser;
+  if(!user) { window.toast && window.toast('Not logged in', '⚠️'); return; }
+
+  try {
+    const { collection, addDoc, serverTimestamp } = window._fbFS;
+    await addDoc(collection(window.db, 'community_posts', postId, 'comments'), {
+      authorId:   user.uid,
+      authorName: user.displayName || 'Anonymous',
+      authorAvatar: user.photoURL || '',
+      text:       text,
+      createdAt:  serverTimestamp(),
+      likes:      []
+    });
+    input.value = '';
+    window._loadCommentsGlobal(postId);
+  } catch(e) {
+    console.error(e);
+    window.toast && window.toast('Error posting comment', '🔥');
+  }
+};
+
+window._loadCommentsGlobal = function(postId) {
+  if(!window.db) return;
+  const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
+  const { collection, query, orderBy, onSnapshot } = window._fbFS;
+  const q = query(
+    collection(window.db, 'community_posts', postId, 'comments'),
+    orderBy('createdAt', 'asc')
+  );
+  onSnapshot(q, snap => {
+    const comments = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    const list = document.getElementById(prefix + '-comments-list');
+    if(!list) return;
+    
+    if(!comments.length){
+      list.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;
+                             color:var(--muted);text-align:center;padding:8px">No comments yet. Start the conversation!</div>`;
+    } else {
+      list.innerHTML = comments.map(c => `
+        <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <img src="${esc(c.authorAvatar)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+              <span style="font-weight:600;font-size:.8rem">${esc(c.authorName)}</span>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)">${relC(c.createdAt)}</span>
+          </div>
+          <div style="font-size:.85rem;color:rgba(232,234,240,.8);line-height:1.6;margin-left:32px">${esc(c.text)}</div>
+        </div>`).join('');
+    }
+  });
+};
+
+window._toggleLikeGlobal = async function(postId) {
+  const user = window.auth.currentUser;
+  if(!user) return;
+
+  const p = window.feedPosts?.find(x => x.id === postId);
+  if(!p) return;
+
+  const isLiked = (p.likes||[]).includes(user.uid);
+  const newLikes = isLiked 
+    ? (p.likes||[]).filter(id => id !== user.uid)
+    : [...(p.likes||[]), user.uid];
+
+  try {
+    const { doc, updateDoc } = window._fbFS;
+    await updateDoc(doc(window.db, 'community_posts', postId), { likes: newLikes });
+  } catch(e) {
+    console.error(e);
+  }
+};
+
+// ─── LEARNING RESOURCES INITIALIZATION ──────────────────
+let learningResourcesInitialized = false;
+async function initializeLearningResources() {
+  if (learningResourcesInitialized) return;
+  learningResourcesInitialized = true;
+
+  try {
+    const { collection, getDocs } = window._fbFS;
+    const snap = await getDocs(collection(window.db, 'learning_resources'));
+    
+    // If resources already exist, skip initialization
+    if(snap.docs.length > 0) return;
+
+    // Initialize with sample learning resources
+    const { addDoc } = window._fbFS;
+    const sampleResources = [
+      {
+        title: 'Python for Data Science',
+        type: 'course',
+        platform: 'Coursera',
+        difficulty: 'Intermediate',
+        rating: 4.8,
+        link: 'https://coursera.org/learn/python-for-data-science',
+        description: 'Complete Python course for data science applications',
+        tags: ['python', 'data science', 'programming']
+      },
+      {
+        title: 'Learn Machine Learning',
+        type: 'course',
+        platform: 'Coursera',
+        difficulty: 'Advanced',
+        rating: 4.9,
+        link: 'https://coursera.org/specializations/machine-learning',
+        description: 'Deep dive into ML algorithms and applications',
+        tags: ['machine learning', 'ai', 'data science']
+      },
+      {
+        title: 'Web Development Bootcamp',
+        type: 'course',
+        platform: 'Udemy',
+        difficulty: 'Beginner',
+        rating: 4.7,
+        link: 'https://udemy.com/web-development',
+        description: 'Full stack web development from scratch',
+        tags: ['web development', 'javascript', 'html', 'css']
+      },
+      {
+        title: 'React.js Tutorial',
+        type: 'tutorial',
+        platform: 'YouTube',
+        difficulty: 'Intermediate',
+        rating: 4.6,
+        link: 'https://youtube.com/react-tutorial',
+        description: 'Learn modern React development',
+        tags: ['react', 'javascript', 'web development']
+      },
+      {
+        title: 'The Complete SQL Bootcamp',
+        type: 'course',
+        platform: 'Udemy',
+        difficulty: 'Beginner',
+        rating: 4.8,
+        link: 'https://udemy.com/sql-bootcamp',
+        description: 'Master SQL and database design',
+        tags: ['sql', 'database', 'programming']
+      },
+      {
+        title: 'AI Engineering Guide',
+        type: 'article',
+        platform: 'Medium',
+        difficulty: 'Intermediate',
+        rating: 4.5,
+        link: 'https://medium.com/ai-engineering',
+        description: 'Best practices for AI engineering',
+        tags: ['ai', 'machine learning', 'engineering']
+      },
+      {
+        title: 'Cloud Computing with AWS',
+        type: 'course',
+        platform: 'Linux Academy',
+        difficulty: 'Intermediate',
+        rating: 4.7,
+        link: 'https://linuxacademy.com/aws',
+        description: 'AWS cloud services and deployment',
+        tags: ['aws', 'cloud', 'devops']
+      },
+      {
+        title: 'JavaScript ES6+ Guide',
+        type: 'article',
+        platform: 'Dev.to',
+        difficulty: 'Intermediate',
+        rating: 4.6,
+        link: 'https://dev.to/javascript',
+        description: 'Modern JavaScript best practices',
+        tags: ['javascript', 'programming', 'web development']
+      },
+      {
+        title: 'UI/UX Design Principles',
+        type: 'course',
+        platform: 'Skillshare',
+        difficulty: 'Beginner',
+        rating: 4.7,
+        link: 'https://skillshare.com/ui-ux',
+        description: 'Fundamentals of UI/UX design',
+        tags: ['design', 'ui', 'ux']
+      },
+      {
+        title: 'Git & GitHub Essentials',
+        type: 'tutorial',
+        platform: 'GitHub Learning',
+        difficulty: 'Beginner',
+        rating: 4.8,
+        link: 'https://github.com/skills',
+        description: 'Version control and collaboration',
+        tags: ['git', 'github', 'programming']
+      }
+    ];
+
+    for(const resource of sampleResources) {
+      await addDoc(collection(window.db, 'learning_resources'), resource);
+    }
+
+    console.log('Learning resources initialized');
+  } catch(e) {
+    console.warn('Error initializing learning resources:', e.message);
+  }
+}
