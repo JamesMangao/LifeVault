@@ -25,10 +25,9 @@
     </div>
   </div>
 
-  {{-- ── TWO-COLUMN LAYOUT ──────────────────────────────────── --}}
-  <div class="grid-2" style="margin-bottom:24px;align-items:start">
+  <div class="grid-2" style="margin-bottom:24px">
 
-    {{-- ── LEFT COLUMN: Time Range + Narrative Style ────────────────── --}}
+    {{-- ── LEFT: Controls ──────────────────────────────────── --}}
     <div style="display:flex;flex-direction:column;gap:16px">
 
       {{-- Time Range --}}
@@ -41,134 +40,46 @@
             ['last90', '🍂', 'Last 3 Months', 'A season of life'],
             ['all',    '🌍', 'All Time',       'Your full story'],
           ] as [$val, $icon, $label, $sub])
-          <div class="story-range-option {{ $val === 'last7' ? 'selected' : '' }}"
+          <div class="story-range-option {{ $val === 'last30' ? 'selected' : '' }}"
                data-range="{{ $val }}"
                onclick="selectRange('{{ $val }}')"
-               style="padding:14px;background:var(--surface2);border-radius:12px;border:1.5px solid {{ $val === 'last7' ? 'var(--accent)' : 'var(--border)' }};cursor:pointer;transition:all .18s">
+               style="padding:14px;background:var(--surface2);border-radius:12px;border:1.5px solid {{ $val === 'last30' ? 'var(--accent)' : 'var(--border)' }};cursor:pointer;transition:all .18s">
             <div style="font-size:1.2rem;margin-bottom:5px">{{ $icon }}</div>
-            <div class="range-label" style="font-size:.78rem;font-weight:700;margin-bottom:2px;color:{{ $val === 'last7' ? 'var(--accent)' : 'var(--text)' }}">{{ $label }}</div>
+            <div class="range-label" style="font-size:.78rem;font-weight:700;margin-bottom:2px;color:{{ $val === 'last30' ? 'var(--accent)' : 'var(--text)' }}">{{ $label }}</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">{{ $sub }}</div>
           </div>
           @endforeach
         </div>
       </div>
 
-      {{-- ── Narrative Style (collapsible) ──────── --}}
-      <div class="card" style="overflow:hidden">
-
-        {{-- Toggle header --}}
-        <div onclick="toggleNarrativeStyle()"
-             style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <span style="font-size:.82rem;font-weight:700;color:var(--text)">&#127917; Narrative Style</span>
-            <span id="narrative-selected-pill"
-                  style="display:none;font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:3px 10px;border-radius:99px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);color:var(--accent)">
-              &#128221; Memoir
-            </span>
-          </div>
-          <div id="narrative-chevron"
-               style="width:22px;height:22px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--muted);transition:transform .3s;flex-shrink:0">
-            &#9650;
-          </div>
-        </div>
-
-        {{-- Collapsible list --}}
-        <div id="narrative-style-body"
-             style="display:flex;flex-direction:column;gap:8px;margin-top:14px;max-height:1000px;opacity:1;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .25s ease,margin-top .25s ease">
+      {{-- Narrative Style --}}
+      <div class="card">
+        <div class="card-title">🎭 Narrative Style</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
           @foreach([
-            ['memoir',                  '&#128221;', 'Memoir',                 'Reflective, intimate first-person prose'],
-            ['literary',                '&#128218;', 'Literary Fiction',        'Vivid, character-driven storytelling'],
-            ['poetic',                  '&#127800;', 'Poetic Prose',            'Lyrical, metaphor-rich language'],
-            ['cinematic',               '&#127916;', 'Cinematic',               'Scene-by-scene, visual narrative'],
-            ['noir',                    '&#128373;&#65039;', 'Noir',            'Hardboiled, cynical and full of suspense'],
-            ['epistolary',              '&#128140;', 'Epistolary',              'A series of letters or diary entries'],
-            ['mythic',                  '&#10024;',  'Mythic',                  'Allegorical tale with mythic archetypes'],
-            ['stream-of-consciousness', '&#129504;', 'Stream of Consciousness', 'Flowing, unfiltered internal monologue'],
-            ['gonzo',                   '&#129322;', 'Gonzo',                   'Subjective first-person, blurring fact & fiction'],
-            ['teen-musical',            '&#127908;', 'Teen Musical',            'Upbeat, dramatic, emotionally heightened'],
+            ['memoir',    '📝', 'Memoir',          'Reflective, intimate first-person prose'],
+            ['literary',  '📚', 'Literary Fiction', 'Vivid, character-driven storytelling'],
+            ['poetic',    '🌸', 'Poetic Prose',    'Lyrical, metaphor-rich language'],
+            ['cinematic', '🎬', 'Cinematic',        'Scene-by-scene, visual narrative'],
           ] as [$val, $icon, $label, $desc])
           <div class="story-style-option {{ $val === 'memoir' ? 'selected' : '' }}"
                data-style="{{ $val }}"
-               data-icon="{{ $icon }}"
-               data-label="{{ $label }}"
                onclick="selectStyle('{{ $val }}')"
                style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border-radius:10px;border:1.5px solid {{ $val === 'memoir' ? 'var(--accent)' : 'var(--border)' }};cursor:pointer;transition:all .18s">
-            <span style="font-size:1.1rem;flex-shrink:0">{!! $icon !!}</span>
+            <span style="font-size:1.1rem;flex-shrink:0">{{ $icon }}</span>
             <div style="flex:1">
               <div class="style-label" style="font-size:.8rem;font-weight:700;color:{{ $val === 'memoir' ? 'var(--accent)' : 'var(--text)' }}">{{ $label }}</div>
               <div style="font-family:'Newsreader',serif;font-size:.72rem;color:var(--muted);font-weight:300;margin-top:1px">{{ $desc }}</div>
             </div>
             <div class="style-check" style="width:18px;height:18px;border-radius:50%;border:1.5px solid {{ $val === 'memoir' ? 'var(--accent)' : 'var(--border)' }};display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ $val === 'memoir' ? 'var(--accent)' : 'transparent' }};transition:all .18s">
-              @if($val === 'memoir')<span style="font-size:.6rem;color:white;font-weight:700">&#10003;</span>@endif
+              @if($val === 'memoir')<span style="font-size:.6rem;color:white;font-weight:700">✓</span>@endif
             </div>
           </div>
           @endforeach
         </div>
-
       </div>
 
-    </div>{{-- /left column --}}
-
-    {{-- ── RIGHT COLUMN: Story output + Focus Themes ── --}}
-    <div style="display:flex;flex-direction:column;gap:16px">
-
-      {{-- ╔══ Story Output Card ══╗ --}}
-      <div class="card" id="story-output-card" style="display:flex;flex-direction:column">
-
-        <div class="card-title">
-          📖 Your Story
-          <span id="story-word-count" style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);font-weight:400;margin-left:auto"></span>
-        </div>
-
-        {{-- Empty State --}}
-        <div id="story-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 16px">
-          <div style="font-size:2.2rem;margin-bottom:10px;opacity:.3">📖</div>
-          <div style="font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:5px">Your story awaits</div>
-          <div style="font-family:'Newsreader',serif;font-style:italic;font-size:.76rem;color:var(--muted);opacity:.65;max-width:220px;line-height:1.5">
-            Configure your settings and click Generate to turn your journal into a narrative
-          </div>
-          <div style="margin-top:14px;display:flex;gap:5px;align-items:center">
-            <div style="width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:.25"></div>
-            <div style="width:5px;height:5px;border-radius:50%;background:var(--lavender);opacity:.25"></div>
-            <div style="width:5px;height:5px;border-radius:50%;background:var(--teal);opacity:.25"></div>
-          </div>
-        </div>
-
-        {{-- Loading State --}}
-        <div id="story-loading-state" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 16px">
-          <div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:ls-spin 1s linear infinite;margin:0 auto 16px"></div>
-          <div style="font-size:.84rem;font-weight:700;margin-bottom:5px;color:var(--text)">Weaving your narrative…</div>
-          <div id="story-loading-step" style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Reading your journals</div>
-        </div>
-
-        {{-- Error State --}}
-        <div id="story-error-state" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 16px">
-          <div style="font-size:1.8rem;margin-bottom:10px">⚠️</div>
-          <div style="font-size:.84rem;font-weight:700;color:var(--text);margin-bottom:6px">Generation failed</div>
-          <div id="story-error-msg" style="font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--muted);max-width:260px;line-height:1.7;word-break:break-word"></div>
-          <button class="btn btn-primary" onclick="generateLifeStory()" style="margin-top:14px;font-size:.76rem">🔄 Try Again</button>
-        </div>
-
-        {{-- Result --}}
-        <div id="story-result" style="display:none;flex-direction:column">
-          <div id="story-chapter-title"
-               style="font-family:'Newsreader',serif;font-size:1.1rem;font-weight:400;font-style:italic;color:var(--accent);margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);line-height:1.4">
-          </div>
-          <div id="story-text"
-               style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.9;color:rgba(232,234,240,.88);font-weight:300;white-space:pre-wrap;overflow-y:auto;padding-right:4px;max-height:480px">
-          </div>
-          <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="generateLifeStory()" style="font-size:.78rem">🔄 Regenerate</button>
-            <button class="btn" onclick="copyStory()" style="font-size:.78rem">📋 Copy</button>
-            <button class="btn" onclick="saveStoryToJournal()" style="font-size:.78rem;border-color:rgba(52,211,153,.3);color:var(--green)">📓 Save to Journal</button>
-            <button class="btn" id="story-save-btn" onclick="saveStoryToSaved()" style="font-size:.78rem;border-color:rgba(167,139,250,.35);color:var(--lavender);background:rgba(167,139,250,.08)">🔖 Save Story</button>
-            <button class="btn" onclick="shareStory()" style="font-size:.78rem;border-color:rgba(45,212,191,.3);color:var(--teal)">↗ Share</button>
-          </div>
-        </div>
-
-      </div>{{-- /story-output-card --}}
-
-      {{-- ── Focus Themes (now beside Narrative Style) ───────────── --}}
+      {{-- Focus Themes --}}
       <div class="card">
         <div class="card-title">
           🏷 Focus Themes
@@ -188,8 +99,75 @@
                placeholder="Any extra context for the AI... (optional)"
                style="font-size:.82rem">
       </div>
+    </div>
 
-    </div>{{-- /right column --}}
+    {{-- ── RIGHT: Output ────────────────────────────────────── --}}
+    <div class="card" style="display:flex;flex-direction:column;min-height:520px">
+
+      <div class="card-title">
+        📖 Your Story
+        <span id="story-word-count" style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);font-weight:400;margin-left:auto"></span>
+      </div>
+
+      {{-- Empty State --}}
+      <div id="story-empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
+        <div style="font-size:3rem;margin-bottom:16px;opacity:.4">📖</div>
+        <div style="font-size:.9rem;font-weight:700;color:var(--muted);margin-bottom:8px">Your story awaits</div>
+        <div style="font-family:'Newsreader',serif;font-style:italic;font-size:.82rem;color:var(--muted);opacity:.7;max-width:260px;line-height:1.6">
+          Configure your settings and click Generate to turn your journal into a narrative
+        </div>
+        <div style="margin-top:24px;display:flex;gap:6px;align-items:center">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.3"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--lavender);opacity:.3"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--teal);opacity:.3"></div>
+        </div>
+      </div>
+
+      {{-- Loading State --}}
+      <div id="story-loading-state" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
+        <div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:ls-spin 1s linear infinite;margin:0 auto 20px"></div>
+        <div style="font-size:.88rem;font-weight:700;margin-bottom:6px;color:var(--text)">Weaving your narrative…</div>
+        <div id="story-loading-step" style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Reading your journals</div>
+      </div>
+
+      {{-- Error State --}}
+      <div id="story-error-state" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px">
+        <div style="font-size:2.4rem;margin-bottom:12px">⚠️</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--text);margin-bottom:8px">Generation failed</div>
+        <div id="story-error-msg" style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted);max-width:300px;line-height:1.7;word-break:break-word"></div>
+        <button class="btn btn-primary" onclick="generateLifeStory()" style="margin-top:18px;font-size:.78rem">🔄 Try Again</button>
+      </div>
+
+      {{-- Result --}}
+      <div id="story-result" style="display:none;flex:1;flex-direction:column">
+        <div id="story-chapter-title"
+             style="font-family:'Newsreader',serif;font-size:1.1rem;font-weight:400;font-style:italic;color:var(--accent);margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);line-height:1.4">
+        </div>
+        <div id="story-text"
+             style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.9;color:rgba(232,234,240,.88);font-weight:300;white-space:pre-wrap;flex:1;overflow-y:auto;padding-right:4px;max-height:420px">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="generateLifeStory()" style="font-size:.78rem">🔄 Regenerate</button>
+          <button class="btn" onclick="copyStory()" style="font-size:.78rem">📋 Copy</button>
+          <button class="btn" onclick="saveStoryToJournal()" style="font-size:.78rem;border-color:rgba(52,211,153,.3);color:var(--green)">📓 Save to Journal</button>
+          <button class="btn" onclick="shareStory()" style="font-size:.78rem;border-color:rgba(45,212,191,.3);color:var(--teal)">↗ Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{-- Saved Stories --}}
+  <div class="card">
+    <div class="card-title">
+      📚 Saved Stories
+      <span style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);font-weight:400;margin-left:auto">Generated narratives from your life</span>
+    </div>
+    <div id="saved-stories-list">
+      <div style="text-align:center;padding:32px;color:var(--muted)">
+        <div style="font-size:2rem;margin-bottom:10px;opacity:.4">📚</div>
+        <div style="font-family:'Newsreader',serif;font-style:italic;font-size:.82rem">No saved stories yet — generate your first one above</div>
+      </div>
+    </div>
   </div>
 
 </div>{{-- /page --}}
@@ -199,24 +177,20 @@
 (function () {
   'use strict';
 
+  // ── Inject styles once ───────────────────────────────────────
   if (!document.getElementById('ls-styles')) {
     const s = document.createElement('style');
     s.id = 'ls-styles';
     s.textContent = `
       @keyframes ls-spin { to { transform: rotate(360deg) } }
       .story-range-option:hover { border-color: var(--accent) !important; }
-      .story-style-option:hover  { border-color: var(--accent) !important; }
-      #story-result { animation: ls-fadeIn .4s cubic-bezier(.4,0,.2,1) both; }
-      @keyframes ls-fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
+      .story-style-option:hover { border-color: var(--accent) !important; }
     `;
     document.head.appendChild(s);
   }
 
-  // ── State ─────────────────────────────────────────────────────
-  let selectedRange  = 'last7';
+  // ── State ────────────────────────────────────────────────────
+  let selectedRange  = 'last30';
   let selectedStyle  = 'memoir';
   let selectedThemes = [];
   let currentStory   = null;
@@ -224,31 +198,7 @@
   const GENERATE_URL = '{{ route("ai.life-story.generate") }}';
   const CSRF_TOKEN   = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
-
-  // ── Narrative Style collapse ──────────────────────────────────
-  let _narrativeOpen = true;
-  window.toggleNarrativeStyle = function () {
-    _narrativeOpen = !_narrativeOpen;
-    const body     = document.getElementById('narrative-style-body');
-    const chevron  = document.getElementById('narrative-chevron');
-    const pill     = document.getElementById('narrative-selected-pill');
-    if (!body) return;
-    if (_narrativeOpen) {
-      body.style.maxHeight  = '1000px';
-      body.style.opacity    = '1';
-      body.style.marginTop  = '14px';
-      chevron.style.transform = 'rotate(0deg)';
-      if (pill) pill.style.display = 'none';
-    } else {
-      body.style.maxHeight  = '0';
-      body.style.opacity    = '0';
-      body.style.marginTop  = '0';
-      chevron.style.transform = 'rotate(180deg)';
-      if (pill) pill.style.display = 'inline-block';
-    }
-  };
-
-  // ── Range selector ────────────────────────────────────────────
+  // ── Range selector ───────────────────────────────────────────
   window.selectRange = (val) => {
     selectedRange = val;
     document.querySelectorAll('.story-range-option').forEach(o => {
@@ -260,7 +210,7 @@
     });
   };
 
-  // ── Style selector ────────────────────────────────────────────
+  // ── Style selector ───────────────────────────────────────────
   window.selectStyle = (val) => {
     selectedStyle = val;
     document.querySelectorAll('.story-style-option').forEach(o => {
@@ -275,15 +225,10 @@
         check.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
         check.innerHTML = on ? '<span style="font-size:.6rem;color:white;font-weight:700">✓</span>' : '';
       }
-      // Update the collapsed pill label
-      if (on) {
-        const pill = document.getElementById('narrative-selected-pill');
-        if (pill) pill.textContent = (o.dataset.icon || '') + ' ' + (o.dataset.label || val);
-      }
     });
   };
 
-  // ── Theme toggle ──────────────────────────────────────────────
+  // ── Theme toggle ─────────────────────────────────────────────
   window.toggleTheme = (theme, el) => {
     const idx = selectedThemes.indexOf(theme);
     if (idx > -1) {
@@ -301,12 +246,11 @@
 
   // ── Panel switcher ────────────────────────────────────────────
   function showPanel(id) {
-    ['story-empty-state','story-loading-state','story-error-state','story-result'].forEach(pid => {
-      const el = document.getElementById(pid);
-      if (!el) return;
-      el.style.display = (pid === id) ? 'flex' : 'none';
-      if (pid === id) el.style.flexDirection = 'column';
-    });
+    ['story-empty-state','story-loading-state','story-error-state','story-result']
+      .forEach(pid => {
+        const el = document.getElementById(pid);
+        if (el) el.style.display = pid === id ? 'flex' : 'none';
+      });
   }
 
   // ── Loading steps animation ───────────────────────────────────
@@ -333,16 +277,10 @@
   // ── Build prompt ──────────────────────────────────────────────
   function buildPrompt(entries) {
     const styleMap = {
-      memoir:                   'first-person memoir prose — reflective, warm, and intimate',
-      literary:                 'literary fiction with vivid sensory detail and a strong character voice',
-      poetic:                   'lyrical poetic prose rich with metaphors and emotional imagery',
-      cinematic:                'cinematic scene-by-scene storytelling — show-don\'t-tell, visual and immersive',
-      noir:                     'hardboiled detective style — cynical, shadowy, and full of suspense',
-      epistolary:               'a series of dated letters or diary entries, creating a personal, unfolding story',
-      mythic:                   'an allegorical tale using mythic archetypes and symbolic, larger-than-life language',
-      'stream-of-consciousness':'a flowing, unfiltered internal monologue, capturing thoughts and feelings as they occur',
-      gonzo:                    'a highly subjective, first-person narrative that blurs the line between fact and fiction, with frenetic energy',
-      'teen-musical':           'an upbeat, dramatic teen-musical style where emotions run high and every moment feels amplified',
+      memoir:    'first-person memoir prose — reflective, warm, and intimate',
+      literary:  'literary fiction with vivid sensory detail and a strong character voice',
+      poetic:    'lyrical poetic prose rich with metaphors and emotional imagery',
+      cinematic: 'cinematic scene-by-scene storytelling — show-don\'t-tell, visual and immersive',
     };
 
     const summarised = entries.slice(0, 20).map(e =>
@@ -351,7 +289,8 @@
       (e.content ?? '').slice(0, 500)
     ).join('\n\n---\n\n');
 
-    const themeNote    = selectedThemes.length ? `Weave these themes prominently: ${selectedThemes.join(', ')}.` : '';
+    const themeNote    = selectedThemes.length
+      ? `Weave these themes prominently: ${selectedThemes.join(', ')}.` : '';
     const extraContext = document.getElementById('story-extra-context')?.value?.trim() ?? '';
 
     return `You are a master literary author helping someone turn their private journal entries into a beautifully written memoir chapter.
@@ -360,15 +299,15 @@ JOURNAL ENTRIES (${entries.length} total, showing up to 20):
 ${summarised}
 
 WRITING INSTRUCTIONS:
-- Write exactly 5 paragraphs of moving, genuine prose in English.
-- Style: ${styleMap[selectedStyle] ?? styleMap.memoir}
-- Use second person ("You…") to make it feel personal and immersive.
-- Draw directly from the real emotions, events, and details in the journals.
-- The very first line must be the chapter title in this EXACT format: TITLE: [your evocative title here] - LIFE STORY GENERATOR
-- After the title line, write ONLY the narrative — no headers, no bullet points, no extra commentary.
+- Write exactly 5 paragraphs of moving, genuine prose
+- Style: ${styleMap[selectedStyle]}
+- Use second person ("You…") to make it feel personal and immersive
+- Draw directly from the real emotions, events, and details in the journals
+- The very first line must be the chapter title in this EXACT format: TITLE: [your evocative title here]
+- After the title line, write ONLY the narrative — no headers, no bullet points, no commentary
 - ${themeNote}
 ${extraContext ? `- Context from the author: ${extraContext}` : ''}
-- End the final paragraph with a sentence that feels like a quiet but meaningful turning point.
+- End the final paragraph with a sentence that feels like a quiet but meaningful turning point
 
 Begin now with the TITLE: line, then the five paragraphs.`;
   }
@@ -376,46 +315,59 @@ Begin now with the TITLE: line, then the five paragraphs.`;
   // ── MAIN: Generate ────────────────────────────────────────────
   window.generateLifeStory = async () => {
     const entries = getJournalsInRange();
-    if (!entries.length) { notify('No journal entries found for this time range 📓'); return; }
+
+    if (!entries.length) {
+      notify('No journal entries found for this time range 📓');
+      return;
+    }
 
     showPanel('story-loading-state');
     document.getElementById('generate-story-btn').disabled = true;
     document.getElementById('story-word-count').textContent = '';
-
-    const saveBtn = document.getElementById('story-save-btn');
-    if (saveBtn) {
-      saveBtn.textContent       = '🔖 Save Story';
-      saveBtn.style.borderColor = 'rgba(167,139,250,.35)';
-      saveBtn.style.background  = 'rgba(167,139,250,.08)';
-      saveBtn.style.color       = 'var(--lavender)';
-      saveBtn.disabled          = false;
-    }
 
     const stepInterval = animateLoadingSteps();
 
     try {
       const res = await fetch(GENERATE_URL, {
         method:  'POST',
-        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': CSRF_TOKEN },
-        body: JSON.stringify({ prompt: buildPrompt(entries), language: 'English', max_tokens: 1400 }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept':       'application/json',
+          'X-CSRF-TOKEN': CSRF_TOKEN,
+        },
+        body: JSON.stringify({
+          prompt:     buildPrompt(entries),
+          max_tokens: 1400,
+        }),
       });
 
       clearInterval(stepInterval);
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.message ?? `HTTP ${res.status}`);
 
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.message ?? `HTTP ${res.status}`);
+      }
+
+      // ── Parse TITLE: line ────────────────────────────────────
       const rawText      = (data.content ?? '').trim();
       const lines        = rawText.split('\n');
       const titleLine    = lines.find(l => /^TITLE:/i.test(l.trim()));
       const chapterTitle = titleLine
-        ? titleLine.replace(/^TITLE:\s*/i, '').replace(/\s*-\s*LIFE STORY GENERATOR\s*$/i, '').trim()
+        ? titleLine.replace(/^TITLE:\s*/i, '').trim()
         : 'A Chapter of Your Life';
-      const storyBody = lines.filter(l => !/^TITLE:/i.test(l.trim())).join('\n').trim();
+      const storyBody    = lines
+        .filter(l => !/^TITLE:/i.test(l.trim()))
+        .join('\n')
+        .trim();
 
       currentStory = {
-        title: chapterTitle, body: storyBody,
-        range: selectedRange, style: selectedStyle, language: 'English',
-        themes: [...selectedThemes], createdAt: new Date(),
+        title:     chapterTitle,
+        body:      storyBody,
+        range:     selectedRange,
+        style:     selectedStyle,
+        themes:    [...selectedThemes],
+        createdAt: new Date(),
       };
 
       document.getElementById('story-chapter-title').textContent = `"${chapterTitle}"`;
@@ -438,47 +390,18 @@ Begin now with the TITLE: line, then the five paragraphs.`;
     }
   };
 
-  // ── Save to Firestore ─────────────────────────────────────────
-  window.saveStoryToSaved = async function () {
-    if (!currentStory) { notify('No story to save yet ⚠️'); return; }
-    const cu = window.currentUser;
-    if (!cu) { notify('You must be logged in to save ⚠️'); return; }
-
-    const btn = document.getElementById('story-save-btn');
-    if (btn) { btn.disabled = true; btn.textContent = '💾 Saving…'; }
-
-    try {
-      const { addDoc, collection, serverTimestamp } = window._fbFS;
-      await addDoc(collection(window.db, 'users', cu.uid, 'life_stories'), { ...currentStory, savedAt: serverTimestamp() });
-
-      if (btn) {
-        btn.textContent = '✅ Saved!';
-        btn.style.borderColor = 'rgba(167,139,250,.5)';
-        btn.style.background  = 'rgba(167,139,250,.15)';
-        btn.style.color       = 'var(--lavender)';
-        setTimeout(() => {
-          btn.textContent       = '🔖 Save Story';
-          btn.style.borderColor = 'rgba(167,139,250,.35)';
-          btn.style.background  = 'rgba(167,139,250,.08)';
-          btn.style.color       = 'var(--lavender)';
-          btn.disabled          = false;
-        }, 2500);
-      }
-      notify('Story saved to 🔖 Saved! ✅');
-    } catch (e) {
-      if (btn) { btn.textContent = '🔖 Save Story'; btn.disabled = false; }
-      notify('Error saving: ' + e.message + ' ❌');
-    }
-  };
-
-  // ── Other actions ─────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────
   window.copyStory = () => {
     if (!currentStory) return;
     const text = `"${currentStory.title}"\n\n${currentStory.body}`;
-    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => notify('Copied to clipboard! 📋'));
-    else {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => notify('Copied to clipboard! 📋'));
+    } else {
       const ta = Object.assign(document.createElement('textarea'), { value: text });
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
       notify('Copied! 📋');
     }
   };
@@ -494,7 +417,9 @@ Begin now with the TITLE: line, then the five paragraphs.`;
         if (c) c.value = currentStory.body;
         notify('Story loaded into journal editor 📓');
       }, 300);
-    } else notify('Open the Journal page to save your story 📓');
+    } else {
+      notify('Open the Journal page to save your story 📓');
+    }
   };
 
   window.shareStory = () => {
@@ -503,6 +428,7 @@ Begin now with the TITLE: line, then the five paragraphs.`;
     else notify('Share feature not available ⚠️');
   };
 
+  // ── Toast helper ──────────────────────────────────────────────
   function notify(msg) {
     if (typeof window.toast === 'function') window.toast(msg);
     else console.info('[LifeStory]', msg);

@@ -42,19 +42,12 @@ class LifeStoryAIController extends Controller
     {
         $request->validate([
             'prompt'     => 'required|string|max:30000',
-            'language'   => 'nullable|string|max:100',
             'max_tokens' => 'nullable|integer|min:100|max:4000',
         ]);
 
         $apiKey    = config('services.openrouter.key');
         $maxTokens = $request->integer('max_tokens', 1400);
         $prompt    = (string) $request->string('prompt');
-
-        // Resolve language — fallback to English if blank
-        $language  = trim((string) $request->input('language', 'English'));
-        if (empty($language)) {
-            $language = 'English';
-        }
 
         if (empty($apiKey)) {
             return response()->json([
@@ -63,20 +56,8 @@ class LifeStoryAIController extends Controller
             ], 500);
         }
 
-        // ── Build the system message ──────────────────────────────
-        // Putting the language directive here, BEFORE the user prompt,
-        // is the most effective way to get consistent non-English output.
-        // The model reads the system message first and frames ALL subsequent
-        // generation through this lens — far better than a single line buried
-        // inside a long English prompt.
-        $systemMessage = "You are a master literary author specialising in memoir and personal narrative. "
-            . "You MUST write your ENTIRE response — including the chapter title and every paragraph — in {$language}. "
-            . "Do NOT use English at all unless {$language} IS English. "
-            . "Write with natural, authentic {$language} phrasing and idioms, exactly as a fluent native {$language} speaker would. "
-            . "Do NOT translate literally from English sentence structures. Think, feel, and write directly in {$language}.";
-
         try {
-            $response = Http::timeout(180)
+            $response = Http::timeout(90)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
                     'HTTP-Referer'  => config('app.url', 'http://localhost'),
@@ -90,14 +71,7 @@ class LifeStoryAIController extends Controller
                     'temperature' => 0.88,
                     'top_p'       => 0.95,
                     'messages'    => [
-                        [
-                            'role'    => 'system',
-                            'content' => $systemMessage,
-                        ],
-                        [
-                            'role'    => 'user',
-                            'content' => $prompt,
-                        ],
+                        ['role' => 'user', 'content' => $prompt]
                     ],
                 ]);
 

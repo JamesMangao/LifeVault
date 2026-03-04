@@ -103,13 +103,17 @@
 </div>
 
 <style>
+/* ── Settings Layout ── */
 .settings-container {
     max-width: 680px;
     padding-bottom: 100px;
 }
+
 .settings-section {
     margin-bottom: 28px;
 }
+
+/* Title uses div not h2 so it inherits Syne like the rest of the app */
 .settings-section-title {
     font-size: .95rem;
     font-weight: 700;
@@ -139,6 +143,8 @@
     border-radius: 16px;
     padding: 6px 20px;
 }
+
+/* ── Toggle rows ── */
 .settings-toggle-row {
     display: flex;
     align-items: center;
@@ -147,7 +153,10 @@
     padding: 16px 0;
     border-bottom: 1px solid var(--border);
 }
-.settings-toggle-row:last-child { border-bottom: none; }
+.settings-toggle-row:last-child {
+    border-bottom: none;
+}
+
 .settings-toggle-label {
     font-size: .84rem;
     font-weight: 600;
@@ -161,6 +170,8 @@
     font-family: 'JetBrains Mono', monospace;
     line-height: 1.4;
 }
+
+/* ── Toggle Switch ── */
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -169,7 +180,9 @@
     flex-shrink: 0;
 }
 .toggle-switch input {
-    opacity: 0; width: 0; height: 0;
+    opacity: 0;
+    width: 0;
+    height: 0;
     position: absolute;
 }
 .toggle-slider {
@@ -184,8 +197,10 @@
 .toggle-slider::before {
     content: '';
     position: absolute;
-    width: 16px; height: 16px;
-    left: 3px; top: 50%;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 50%;
     transform: translateY(-50%);
     background: var(--muted);
     border-radius: 50%;
@@ -199,6 +214,8 @@
     transform: translateX(20px) translateY(-50%);
     background: var(--accent);
 }
+
+/* ── Danger button ── */
 .settings-btn-danger {
     border-color: rgba(248,113,113,.35) !important;
     color: var(--rose) !important;
@@ -211,18 +228,16 @@
 /* ── Save Bar ── */
 .settings-save-bar {
     position: fixed;
-    bottom: -200px;
-    left: 260px;
+    bottom: -80px;
+    left: 260px; /* match sidebar width */
     right: 0;
     padding: 0 36px 20px;
     transition: bottom .3s cubic-bezier(.34,1.56,.64,1);
     z-index: 100;
     pointer-events: none;
-    visibility: hidden;
 }
 .settings-save-bar.visible {
     bottom: 0;
-    visibility: visible;
 }
 .settings-save-bar-content {
     max-width: 680px;
@@ -243,35 +258,41 @@
     color: var(--muted);
     font-family: 'Syne', sans-serif;
 }
+
 @media (max-width: 600px) {
-    .settings-save-bar { left: 0; padding: 0 16px 16px; }
+    .settings-save-bar {
+        left: 0;
+        padding: 0 16px 16px;
+    }
 }
 </style>
 
-<!-- REPLACE ONLY THE <script> BLOCK in your settings.blade.php with this -->
-
 <script>
 (function () {
+    // Guard: only show save bar after settings have fully loaded
     let _settingsReady = false;
-    let _initialSettings = {};
 
-    window.renderSettingsPage = async function() {
-        console.log('[Settings] renderSettingsPage called');
-        _settingsReady = false;
-        _initialSettings = {};
-        _hideSaveBar();
+    // ── Wait for Firebase to be ready ──────────────────────────
+    function waitForFirebase(cb) {
+        if (window.db && window.auth && window._fbFS) {
+            cb();
+        } else {
+            setTimeout(() => waitForFirebase(cb), 80);
+        }
+    }
 
-        if (!window.currentUser) { console.warn('[Settings] no currentUser'); return; }
+    // ── Load settings from Firestore ──────────────────────────
+    async function loadUserSettings() {
+      if (!window.currentUser) return; // Prevent race condition on initial load
         const user = window.auth.currentUser;
-        if (!user) { console.warn('[Settings] no auth.currentUser'); return; }
+        if (!user) return;
 
-        console.log('[Settings] attaching listeners...');
+        // Attach listeners first but guard with _settingsReady flag
         _attachChangeListeners();
 
         try {
             const { getDoc, doc } = window._fbFS;
             const snap = await getDoc(doc(window.db, 'settings', user.uid));
-            console.log('[Settings] snap exists:', snap.exists());
 
             if (snap.exists()) {
                 const s = snap.data();
@@ -286,60 +307,46 @@
                 }
             }
         } catch (e) {
-            console.warn('[Settings] load error:', e.message);
+            console.warn('Settings load error:', e.message);
         }
 
-        _initialSettings = _getCurrentSettings();
-        console.log('[Settings] initial snapshot:', _initialSettings);
+        // Only NOW allow the save bar to appear on toggle changes
         _settingsReady = true;
-        console.log('[Settings] ready!');
+        // Make sure save bar is hidden on initial load
+        _hideSaveBar();
     }
 
+    // Directly set .checked without triggering any events
     function _setToggle(id, value) {
         const el = document.getElementById(id);
         if (el) el.checked = Boolean(value);
     }
 
     function _attachChangeListeners() {
-        const inputs = document.querySelectorAll('#page-settings .toggle-switch input');
-        console.log('[Settings] found', inputs.length, 'toggle inputs');
-        inputs.forEach(el => {
+        document.querySelectorAll('#page-settings .toggle-switch input').forEach(el => {
             el.addEventListener('change', () => {
-                console.log('[Settings] toggle fired, ready=', _settingsReady);
-                if (_settingsReady) _checkIfSettingsChanged();
+                // Only show save bar if initial load is complete
+                if (_settingsReady) _showSaveBar();
             });
         });
     }
 
-    function _checkIfSettingsChanged() {
-        const current = _getCurrentSettings();
-        const hasChanged = Object.keys(current).some(key => current[key] !== _initialSettings[key]);
-        console.log('[Settings] hasChanged:', hasChanged);
-        hasChanged ? _showSaveBar() : _hideSaveBar();
-    }
-
-    function _getCurrentSettings() {
-        return {
-            'notif-journal':     document.getElementById('notif-journal').checked,
-            'notif-goals':       document.getElementById('notif-goals').checked,
-            'notif-community':   document.getElementById('notif-community').checked,
-            'privacy-public':    document.getElementById('privacy-public').checked,
-            'privacy-community': document.getElementById('privacy-community').checked,
-        };
-    }
-
+    // ── Save bar ──────────────────────────────────────────────
     function _showSaveBar() {
-        console.log('[Settings] _showSaveBar called');
         document.getElementById('settings-save-bar').classList.add('visible');
     }
     function _hideSaveBar() {
-        const el = document.getElementById('settings-save-bar');
-        if (el) el.classList.remove('visible');
+        document.getElementById('settings-save-bar').classList.remove('visible');
     }
 
+    // ── Save settings ─────────────────────────────────────────
     async function saveUserSettings() {
         const user = window.auth.currentUser;
-        if (!user) { window.toast && window.toast('You must be logged in.', '⚠️'); return false; }
+        if (!user) {
+            window.toast && window.toast('You must be logged in.', '⚠️');
+            return false;
+        }
+
         const data = {
             notifications: {
                 journal:   document.getElementById('notif-journal').checked,
@@ -363,13 +370,16 @@
         }
     }
 
+    // ── Export data ───────────────────────────────────────────
     window.exportUserData = async function () {
         const user = window.auth.currentUser;
         if (!user) { window.toast && window.toast('Not logged in.', '⚠️'); return; }
         window.toast && window.toast('Gathering your data…', '📦');
+
         try {
             const { getDocs, getDoc, collection, doc } = window._fbFS;
             const uid = user.uid;
+
             const [profileSnap, settingsSnap, jSnap, tSnap, gSnap] = await Promise.all([
                 getDoc(doc(window.db, 'users', uid)),
                 getDoc(doc(window.db, 'settings', uid)),
@@ -377,9 +387,15 @@
                 getDocs(collection(window.db, 'users', uid, 'tasks')),
                 getDocs(collection(window.db, 'users', uid, 'goals')),
             ]);
+
             const exportData = {
                 exportedAt: new Date().toISOString(),
-                user: { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL },
+                user: {
+                    uid:         user.uid,
+                    email:       user.email,
+                    displayName: user.displayName,
+                    photoURL:    user.photoURL,
+                },
                 profile:  profileSnap.exists()  ? profileSnap.data()  : null,
                 settings: settingsSnap.exists() ? settingsSnap.data() : null,
                 collections: {
@@ -388,14 +404,17 @@
                     goals:    gSnap.docs.map(d => ({ id: d.id, ...d.data() })),
                 }
             };
+
             const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url  = URL.createObjectURL(blob);
             const a    = document.createElement('a');
-            a.href = url;
+            a.href     = url;
             a.download = `lifevault-data-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a); a.click();
+            document.body.appendChild(a);
+            a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+
             window.toast && window.toast('Export complete!', '✅');
         } catch (e) {
             console.error(e);
@@ -403,6 +422,7 @@
         }
     };
 
+    // ── Delete account ────────────────────────────────────────
     window.confirmDeleteAccount = async function () {
         if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
         const user = window.auth.currentUser;
@@ -416,13 +436,20 @@
         }
     };
 
+    // ── handleSave (called by onclick in HTML) ────────────────
     window.handleSave = async function () {
         const ok = await saveUserSettings();
-        if (ok) {
-            _hideSaveBar();
-            _initialSettings = _getCurrentSettings();
-        }
+        if (ok) _hideSaveBar();
     };
 
+    // ── Boot: wait for Firebase then load ────────────────────
+    waitForFirebase(() => {
+        const unsub = window.auth.onAuthStateChanged(user => {
+            if (user) {
+                loadUserSettings();
+                unsub();
+            }
+        });
+    });
 })();
 </script>

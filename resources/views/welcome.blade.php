@@ -1,4 +1,4 @@
-<!DOCTYPE html>
++56+0<0.!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,7 @@
         // Hugging Face API Configuration
         // 🔑 IMPORTANT: Replace with your actual Hugging Face API token
         // Get it from: https://huggingface.co/settings/tokens
-        window.huggingfaceApiKey = "{{ config('services.huggingface.api_key', 'HUGGINGFACE_API_KEY') }}";
+        window.huggingfaceApiKey = "{{ config('services.huggingface.api_key', 'YOUR_HUGGINGFACE_API_TOKEN_HERE') }}";
     </script>
 
     <style>
@@ -99,14 +99,11 @@
     <div id="auth-screen">
         <div class="auth-card">
             <div class="auth-logo">LifeVault</div>
-            <p class="auth-tagline">Your personal space for thoughts, tasks &amp; goals</p>
+            <p class="auth-tagline">Your private, encrypted, personal space.</p>
             <div class="auth-features">
                 <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(167,139,250,.15);color:var(--lavender)">📓</div> Journal everything</div>
                 <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(52,211,153,.15);color:var(--green)">✅</div> Manage your tasks</div>
                 <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(251,191,36,.15);color:var(--amber)">🎯</div> Track your goals</div>
-                <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(59, 130, 246, 0.15);color:#3B82F6">📄</div> Analyze your resume</div>
-                <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(216, 180, 254, 0.15);color:#D8B4FE">🎭</div> Explore your shadow self</div>
-                <div class="auth-feature"><div class="auth-feature-icon" style="background:rgba(240, 210, 130, 0.15);color:#F0D282">📜</div> Write your life story</div>
             </div>
             <button class="google-btn" id="google-login-btn">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" class="google-icon">
@@ -129,7 +126,6 @@
             @include('community')
             @include('analyzer')
             @include('shadow-self')
-            @include('saved-analyses')
             @include('life-story')
             @include('settings')
             @include('profile')

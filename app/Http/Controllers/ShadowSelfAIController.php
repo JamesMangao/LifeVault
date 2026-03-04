@@ -8,22 +8,25 @@ use Illuminate\Support\Facades\Log;
 
 class ShadowSelfAIController extends Controller
 {
+    // ── Groq API config ───────────────────────────────────────────────────────
     private const GROQ_MODEL = 'llama-3.3-70b-versatile';
     private const GROQ_API   = 'https://api.groq.com/openai/v1/chat/completions';
 
+    // ──────────────────────────────────────────────────────────────────────────
+    //  POST /ai/shadow-self/analyze
+    //  Finds recurring negative patterns & reframes them compassionately
+    // ──────────────────────────────────────────────────────────────────────────
     public function analyzeShadowSelf(Request $request)
     {
-        $request->headers->set('Accept', 'application/json');
-
-        $apiKey = config('services.groq.key');
-
         $request->validate([
             'entries'             => 'required|array|min:3|max:30',
             'entries.*.title'     => 'nullable|string|max:255',
-            'entries.*.content'   => 'nullable|string|max:10000',
-            'entries.*.mood'      => 'nullable|numeric|min:1|max:5',
+            'entries.*.content'   => 'nullable|string|max:2000',
+            'entries.*.mood'      => 'nullable|integer|min:1|max:5',
             'entries.*.createdAt' => 'nullable|string',
         ]);
+
+        $apiKey = config('services.groq.key');
 
         if (! $apiKey) {
             return response()->json(
@@ -51,15 +54,10 @@ class ShadowSelfAIController extends Controller
             $patternsResponse = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type'  => 'application/json',
-            ])->withOptions([
-                'verify' => false, // ← temporary SSL bypass for debugging
-                'curl'   => [
-                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-                ],
             ])->timeout(30)->post(self::GROQ_API, [
                 'model'       => self::GROQ_MODEL,
                 'max_tokens'  => 1024,
-                'temperature' => 0.4,
+                'temperature' => 0.4, // lower = more consistent JSON output
                 'messages'    => [
                     [
                         'role'    => 'system',
@@ -86,7 +84,6 @@ class ShadowSelfAIController extends Controller
                                    . "    {\"shadow\": \"<negative belief>\", \"reframe\": \"<compassionate truth>\"}\n"
                                    . "  ],\n"
                                    . "  \"growthActions\": [\"<specific action>\"],\n"
-                                   . "  \"growthActions\": [\"<specific action>\"],\n"
                                    . "  \"hiddenStrengths\": [\"<strength found in journals>\"]\n"
                                    . "}\n\n"
                                    . "Rules: 3-5 patterns, 3-4 reframes, 3-4 growthActions, 4-6 hiddenStrengths. "
@@ -95,42 +92,37 @@ class ShadowSelfAIController extends Controller
                 ],
             ]);
 
-
             if ($patternsResponse->failed()) {
-                $status    = $patternsResponse->status();
-                $body      = $patternsResponse->body();
-                $groqError = $patternsResponse->json()['error']['message'] ?? $body;
-                Log::error('GROQ DEBUG failed response full body: ' . $body);
+                $status = $patternsResponse->status();
+                Log::error('LifeStoryAI [Groq] shadowSelf error', [
+                    'status' => $status,
+                    'body'   => $patternsResponse->body(),
+                ]);
                 return response()->json(
-                    ['error' => "Groq API error ({$status}): {$groqError}"],
+                    ['error' => "Groq API error ({$status}). Please try again."],
                     $status
                 );
             }
 
-            $raw = $patternsResponse->json()['choices'][0]['message']['content'] ?? '';
+            $raw   = $patternsResponse->json()['choices'][0]['message']['content'] ?? '';
+            $clean = trim(preg_replace('/^```json\s*|^```\s*|```$/m', '', trim($raw)));
 
-            if (empty($raw)) {
-                Log::error('GROQ DEBUG full response when empty: ' . json_encode($patternsResponse->json()));
+            if (empty($clean)) {
                 return response()->json(
-                    ['error' => 'Groq returned no content. Check logs for details.'],
+                    ['error' => 'The AI returned an empty response. Please try again.'],
                     500
                 );
             }
 
-            $clean = preg_replace('/^```(?:json)?\s*/i', '', trim($raw));
-            $clean = preg_replace('/\s*```$/', '', $clean);
-            $clean = trim($clean);
-
             $data = json_decode($clean, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error('GROQ DEBUG JSON parse failed', [
+                Log::error('LifeStoryAI [Groq] shadow JSON parse failed', [
                     'raw'   => $raw,
-                    'clean' => $clean,
                     'error' => json_last_error_msg(),
                 ]);
                 return response()->json(
-                    ['error' => 'Could not parse AI response: ' . json_last_error_msg()],
+                    ['error' => 'Could not parse the AI response. Please try again.'],
                     500
                 );
             }
@@ -142,13 +134,13 @@ class ShadowSelfAIController extends Controller
             ]);
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::error('GROQ DEBUG connection error: ' . $e->getMessage());
+            Log::error('LifeStoryAI [Groq] shadow connection error', ['msg' => $e->getMessage()]);
             return response()->json(
-                ['error' => 'Could not reach Groq: ' . $e->getMessage()],
+                ['error' => 'Could not reach Groq. Please check your connection and try again.'],
                 504
             );
         } catch (\Exception $e) {
-            Log::error('GROQ DEBUG unexpected error: ' . $e->getMessage());
+            Log::error('LifeStoryAI [Groq] shadow unexpected error', ['msg' => $e->getMessage()]);
             return response()->json(
                 ['error' => 'An unexpected error occurred: ' . $e->getMessage()],
                 500

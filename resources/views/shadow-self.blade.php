@@ -5,6 +5,7 @@
       <div class="page-title">🪞 Shadow Self <span style="background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Analyzer</span></div>
       <div class="page-subtitle">Uncover hidden patterns and recurring shadows in your inner world</div>
     </div>
+    {{-- FIX 1: Added missing onclick="analyzeShadowSelf()" --}}
     <button class="btn" id="shadow-analyze-btn"
             onclick="analyzeShadowSelf()"
             style="background:linear-gradient(135deg,rgba(248,113,113,.15),rgba(167,139,250,.15));border-color:rgba(248,113,113,.35);color:var(--rose);font-weight:700">
@@ -66,14 +67,7 @@
         <div id="shadow-summary-title" style="font-size:.95rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px"></div>
         <div id="shadow-summary-text" style="font-family:'Newsreader',serif;font-size:.85rem;color:rgba(232,234,240,.75);font-weight:300;line-height:1.65"></div>
       </div>
-      {{-- Action buttons --}}
-      <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
-        <button class="btn" onclick="analyzeShadowSelf()" style="font-size:.75rem">🔄 Re-analyze</button>
-        <button class="btn" id="shadow-save-btn" onclick="saveCurrentAnalysis()"
-                style="font-size:.75rem;border-color:rgba(52,211,153,.35);color:var(--green);background:rgba(52,211,153,.08)">
-          🔖 Save Analysis
-        </button>
-      </div>
+      <button class="btn" onclick="analyzeShadowSelf()" style="font-size:.75rem;flex-shrink:0">🔄 Re-analyze</button>
     </div>
 
     {{-- Patterns Grid --}}
@@ -139,18 +133,21 @@ window.analyzeShadowSelf = async () => {
 
   const stepInterval = animateShadowSteps();
 
+  // FIX 3: Send structured entries array — matches controller's validate() rules
   const formattedEntries = entries.map(e => ({
     title:     e.title     || 'Untitled',
-    content:   (e.content   || '').substring(0, 1900),
-    mood:      parseInt(e.mood) || 3,
+    content:   e.content   || '',
+    mood:      e.mood      || 3,
     createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : null,
   }));
 
   try {
-    const response = await fetch('http://127.0.0.1:8000/ai/shadow-self/analyze', {
+    // FIX 2: Correct route → /ai/shadow-self/analyze
+    const response = await fetch('/ai/shadow-self/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
       },
       body: JSON.stringify({ entries: formattedEntries }),
     });
@@ -162,6 +159,7 @@ window.analyzeShadowSelf = async () => {
       throw new Error(err.error || `HTTP ${response.status}`);
     }
 
+    // FIX 4: Controller returns { success: true, data: {...} } — not { content } or { text }
     const json = await response.json();
 
     if (!json.success || !json.data) {
@@ -173,17 +171,6 @@ window.analyzeShadowSelf = async () => {
 
     document.getElementById('shadow-loading').style.display = 'none';
     document.getElementById('shadow-results').style.display = 'block';
-
-    // Reset save button state for new analysis
-    const saveBtn = document.getElementById('shadow-save-btn');
-    if (saveBtn) {
-      saveBtn.textContent      = '🔖 Save Analysis';
-      saveBtn.style.borderColor = 'rgba(52,211,153,.35)';
-      saveBtn.style.background  = 'rgba(52,211,153,.08)';
-      saveBtn.style.color       = 'var(--green)';
-      saveBtn.disabled          = false;
-    }
-
     window.toast('Pattern analysis complete 🪞', '✨');
 
   } catch (err) {
@@ -266,51 +253,6 @@ function renderShadowResults(data) {
     return `<span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:6px 14px;border-radius:99px;background:${bg};border:1px solid ${border};color:${color};text-transform:uppercase;letter-spacing:.07em;animation:slideDown .3s ease both;animation-delay:${i * 50}ms">${shadowEsc(s)}</span>`;
   }).join('');
 }
-
-// ── Save current analysis to Firestore ────────────────────────
-window.saveCurrentAnalysis = async function () {
-  if (!shadowAnalysis) {
-    window.toast?.('No analysis to save yet', '⚠️');
-    return;
-  }
-
-  const cu = window.currentUser;
-  if (!cu) {
-    window.toast?.('You must be logged in to save', '⚠️');
-    return;
-  }
-
-  const btn = document.getElementById('shadow-save-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '💾 Saving…'; }
-
-  try {
-    const { addDoc, collection, serverTimestamp } = window._fbFS;
-    await addDoc(collection(window.db, 'users', cu.uid, 'shadow_analyses'), {
-      ...shadowAnalysis,
-      savedAt: serverTimestamp(),
-    });
-
-    if (btn) {
-      btn.textContent       = '✅ Saved!';
-      btn.style.borderColor = 'rgba(52,211,153,.5)';
-      btn.style.background  = 'rgba(52,211,153,.15)';
-      btn.style.color       = 'var(--green)';
-      setTimeout(() => {
-        btn.textContent       = '🔖 Save Analysis';
-        btn.style.borderColor = 'rgba(52,211,153,.35)';
-        btn.style.background  = 'rgba(52,211,153,.08)';
-        btn.style.color       = 'var(--green)';
-        btn.disabled          = false;
-      }, 2500);
-    }
-
-    window.toast?.('Analysis saved! View it in 🔖 Saved', '✅');
-
-  } catch (e) {
-    if (btn) { btn.textContent = '🔖 Save Analysis'; btn.disabled = false; }
-    window.toast?.('Error saving: ' + e.message, '❌');
-  }
-};
 
 // Named shadowEsc to avoid any conflict with the global esc()
 function shadowEsc(s) {

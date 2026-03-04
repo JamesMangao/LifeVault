@@ -25,5 +25,3 @@ Route::get('/ai/life-story/models', [LifeStoryAIController::class, 'models'])
 // ── Shadow Self AI ────────────────────────────────────────────
 Route::post('/ai/shadow-self/analyze', [ShadowSelfAIController::class, 'analyzeShadowSelf'])
     ->name('ai.shadow-self.analyze');
-
-Route::get('/resume/debug-ocr', [App\Http\Controllers\ResumeAnalysisController::class, 'debugOcr']);

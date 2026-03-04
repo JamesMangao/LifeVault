@@ -24,8 +24,6 @@
         <div id="new-posts-dot"></div>
     </div>
     <div class="nav-item" data-page="profile" onclick="navigateTo('profile', event)"><span class="nav-icon">👤</span> Profile</div>
-    <div class="nav-item" data-page="saved" onclick="navigateTo('saved', event)"><span class="nav-icon">🔖</span> Saved</div>
-    
     <div class="nav-section-label">AI Tools</div>
     <div class="nav-item" data-page="analyzer" onclick="navigateTo('analyzer', event)"><span class="nav-icon">🔎</span> Resume Analyzer</div>
     <div class="nav-item" data-page="shadow-self" onclick="navigateTo('shadow-self', event)"><span class="nav-icon">👤</span> Shadow Self Analyzer</div>

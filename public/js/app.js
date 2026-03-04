@@ -5,14 +5,17 @@ import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateD
          query, orderBy, limit, where, arrayUnion, arrayRemove, increment, serverTimestamp, onSnapshot, Timestamp, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+// Make Firebase instances globally available
 let auth, db;
+
+// Initialize Firebase
 const fbApp = initializeApp(window.firebaseConfig);
 auth = getAuth(fbApp);
 db = getFirestore(fbApp);
 
 window.auth = auth;
 window.db = db;
-window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch, arrayUnion, arrayRemove, increment, limit, Timestamp };
+window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch };
 
 let currentUser = null;
 let journals = [], tasks = [], goals = [];
@@ -27,7 +30,7 @@ let feedUnsubscribe = null;
 let composerType = 'thought';
 let userProfile = {};
 let selectedAvatarUrl = '';
-let selectedCoverData = null;
+let selectedCoverData = null; // { type: 'preset'|'hex', value: string (gradient CSS) }
 
 const MOTIVATIONS = ["Every small step counts 🚀","Progress, not perfection 🎯","You're stronger than you think 💪","Today is full of possibilities ✨","Be kind to yourself 💖","Your future self will thank you 🙏","You've got this! 🔥","Growth happens outside comfort zones 🌱"];
 const CAT_ICONS = {health:'💪',learn:'📚',finance:'💰',career:'💼',personal:'🌱',other:'⭐'};
@@ -83,15 +86,17 @@ window.addEventListener('load', () => {
     onAuthStateChanged(auth, user => {
       if (user) {
         currentUser = user;
-        window.currentUser = user;
+        window.currentUser = user; // Expose for debugging
         showApp(user);
         loadAll();
-      } else showAuth();
+      }
+      else showAuth();
     });
+    // Fallback if auth never fires
     setTimeout(() => {
-      const authEl = document.getElementById('auth-screen');
-      const appEl  = document.getElementById('app');
-      if (authEl.style.display === 'none' && appEl.style.display === 'none') showAuth();
+      const auth = document.getElementById('auth-screen');
+      const app  = document.getElementById('app');
+      if (auth.style.display === 'none' && app.style.display === 'none') showAuth();
     }, 6000);
   }, 1200);
 });
@@ -109,9 +114,9 @@ function showApp(user) {
   document.getElementById('user-avatar').src = av;
   document.getElementById('composer-avatar').src = av;
   updateGreeting();
-  ensureUserProfileExists(user);
+  ensureUserProfileExists(user); // Ensure a user profile document exists
   loadUserProfile();
-  restoreLastPage();
+  restoreLastPage(); // Restore last page on app load
 }
 
 async function ensureUserProfileExists(user) {
@@ -120,6 +125,8 @@ async function ensureUserProfileExists(user) {
   try {
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) {
+      // User document doesn't exist, so create it
+      console.log(`[Debug] User profile for ${user.uid} not found. Creating one.`);
       await setDoc(userRef, {
         displayName: user.displayName || 'Anonymous',
         email: user.email,
@@ -129,6 +136,7 @@ async function ensureUserProfileExists(user) {
         isPublic: true,
         joinedAt: serverTimestamp()
       });
+      console.log(`[Debug] User profile created for ${user.uid}.`);
     } else {
       console.log(`[Debug] User profile for ${user.uid} already exists.`);
     }
@@ -161,10 +169,15 @@ async function loadAll() {
     journals = j.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     tasks    = t.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     goals    = g.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
+
+    // Expose for debugging
     window.journals = journals;
     window.tasks = tasks;
     window.goals = goals;
+
+    // Subscribe to community feed so posts are available on all pages
     subscribeFeed();
+    
     renderAll();
   } catch(e) { toast('Load error: '+e.message,'❌'); }
 }
@@ -181,26 +194,26 @@ window.navigateTo = (page, event) => {
   if (event) event.stopPropagation();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const pageEl = document.getElementById('page-'+page);
-  if (!pageEl) return;
-  pageEl.classList.add('active');
-  const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
-  if (navEl) navEl.classList.add('active');
-  localStorage.setItem('lifeVaultLastPage', page);
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  localStorage.setItem('lifeVaultLastPage', page); // Save current page
   closeSidebar();
   if (page === 'insights')   renderInsights();
   if (page === 'community')  { subscribeFeed(); document.getElementById('new-posts-dot').style.display='none'; }
   if (page === 'profile')    renderProfilePage();
-  if (page === 'settings')   window.renderSettingsPage && window.renderSettingsPage();
+  if (page === 'settings')   window.renderSettingsPage();
   if (page === 'shadow-self' || page === 'life-story') initializeLearningResources();
 };
 
 function restoreLastPage() {
-  const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
-  navigateTo(lastPage);
+    const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
+    navigateTo(lastPage);
 }
 
-/* ══ JOURNAL EXPAND ══════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════
+   JOURNAL EXPAND  —  FIX: use dataset + delegated listeners
+══════════════════════════════════════════════════════════════ */
 window.openExpandedJournal = id => {
   const e = journals.find(j => j.id === id);
   if (!e) return;
@@ -249,47 +262,58 @@ window.shareJournalFromExpanded = () => {
 document.getElementById('journal-expand-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('journal-expand-overlay')) closeExpandedJournal();
 });
-
-/* ══ FIX: ESC only closes journal overlay when community overlays are NOT open ══ */
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  // Let community.blade.php's own ESC handler deal with its overlays
-  if (document.getElementById('upm-overlay')?.classList.contains('open')) return;
-  if (document.getElementById('post-expand-overlay-comm')?.classList.contains('open')) return;
-  if (document.getElementById('share-modal')?.classList.contains('open')) return;
-  if (expandedJournalId) closeExpandedJournal();
+  if (e.key === 'Escape' && expandedJournalId) closeExpandedJournal();
 });
 
-/* ══ JOURNAL DELEGATED LISTENERS ════════════════════════════ */
-function initJournalListeners(containerId) {
-  const container = document.getElementById(containerId);
+/* ══ DELEGATED LISTENERS ═════════════════════════════════════ */
+function initExpandableCards(container) {
   if (!container) return;
-  const fresh = container.cloneNode(true);
-  container.parentNode.replaceChild(fresh, container);
-  document.getElementById(containerId).addEventListener('click', handleJournalClick);
-}
+  container.onclick = e => {
+    // Photo clicks
+    const photoEl = e.target.closest('[data-photo]');
+    if (photoEl) { e.stopPropagation(); viewPhoto(photoEl.dataset.photo); return; }
 
-function handleJournalClick(e) {
-  const entry = e.target.closest('.journal-entry');
-  if (!entry) return;
-  const journalId = entry.dataset.id;
-  const action = e.target.closest('[data-action]')?.dataset.action;
-  if (action) {
-    e.stopPropagation();
-    switch (action) {
-      case 'share':  shareJournal(journalId);     break;
-      case 'edit':   openJournalModal(journalId); break;
-      case 'delete': delJournal(journalId);       break;
-      case 'expand-preview':
-        entry.querySelector('.entry-preview')?.classList.toggle('expanded');
-        break;
+    // Action button clicks — stop propagation so they don't trigger expand
+    const shareBtn = e.target.closest('[data-share]');
+    if (shareBtn) { e.stopPropagation(); shareJournal(shareBtn.dataset.share); return; }
+
+    const editBtn = e.target.closest('[data-edit]');
+    if (editBtn) { e.stopPropagation(); openJournalModal(editBtn.dataset.edit); return; }
+
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) { e.stopPropagation(); delJournal(delBtn.dataset.del); return; }
+
+    // Community Post actions - these will only work if data-* attributes are added to post cards
+    const likeBtn = e.target.closest('[data-like]');
+    if (likeBtn) { e.stopPropagation(); toggleLike(likeBtn.dataset.like); return; }
+
+    const userBtn = e.target.closest('[data-user]');
+    if (userBtn) { e.stopPropagation(); openUserProfileModal(userBtn.dataset.user); return; }
+
+    // Expand — clicking anywhere on the card that isn't a button
+    const entryEl = e.target.closest('.journal-entry, .post-card');
+    if (entryEl) {
+      // For journals, toggle preview. For posts, open expanded view.
+      if (entryEl.classList.contains('journal-entry')) {
+        const preview = entryEl.querySelector('.entry-preview');
+        if (preview) preview.classList.toggle('expanded');
+      } else if (entryEl.classList.contains('post-card')) {
+        const postId = entryEl.getAttribute('data-expand') || entryEl.getAttribute('data-post-id');
+        if (postId) {
+          // Use the profile page's expanded post handler if available
+          if (typeof window._profileOpenExpandedPost === 'function') {
+            window._profileOpenExpandedPost(postId);
+          } else if (typeof window.openExpandedPost === 'function') {
+            window.openExpandedPost(postId);
+          }
+        }
+      }
     }
-  } else {
-    openExpandedJournal(journalId);
-  }
+  };
 }
 
-/* ══ RENDER JOURNALS ═════════════════════════════════════════ */
+/* ══ RENDER JOURNALS — template literals, data-id delegation ══ */
 function renderJournals(containerId, maxCount, isDash) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -307,19 +331,21 @@ function renderJournals(containerId, maxCount, isDash) {
   container.innerHTML = list.map(e => {
     const photosHtml = e.photoUrls?.length
       ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-          ${e.photoUrls.map(u => `<img src="${u}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)" onclick="event.stopPropagation();viewPhoto('${u}')">`).join('')}
+          ${e.photoUrls.map(u => `<img src="${u}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)" data-photo="${u}">`).join('')}
         </div>` : '';
     const tagsHtml = e.tags?.length
       ? `<div class="entry-tags">${e.tags.map(t => `<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`
       : '';
+
     const actionBtns = isDash
-      ? `<button class="journal-entry-actions" data-action="share" title="Share" style="background:none;border:1px solid rgba(45,212,191,.3);color:var(--teal);cursor:pointer;font-size:.72rem;padding:4px 8px;border-radius:6px">↗</button>`
+      ? `<button class="journal-entry-actions" data-share="${e.id}" title="Share" style="background:none;border:1px solid rgba(45,212,191,.3);color:var(--teal);cursor:pointer;font-size:.72rem;padding:4px 8px;border-radius:6px">↗</button>`
       : `<div class="journal-entry-actions">
-           <button data-action="share" title="Share">↗</button>
-           <button data-action="edit" title="Edit">✎</button>
-           <button class="del-btn" data-action="delete" title="Delete">✕</button>
+           <button data-share="${e.id}" title="Share">↗</button>
+           <button data-edit="${e.id}" title="Edit">✎</button>
+           <button class="del-btn" data-del="${e.id}" title="Delete">✕</button>
          </div>`;
-    return `<div class="journal-entry" data-id="${e.id}">
+
+    return `<div class="journal-entry" data-expand="${e.id}">
       <div class="entry-header">
         <div>
           <div style="font-size:.85rem;font-weight:600;margin-bottom:2px">${esc(e.title || 'Untitled')}</div>
@@ -336,7 +362,7 @@ function renderJournals(containerId, maxCount, isDash) {
     </div>`;
   }).join('');
 
-  initJournalListeners(containerId);
+  initExpandableCards(container);
 }
 
 window.selectMood = (val, emoji) => {
@@ -346,6 +372,7 @@ window.selectMood = (val, emoji) => {
 };
 
 window.openJournalModal = (id = null) => {
+  if (!journals) return; // Don't open if data isn't loaded
   editJournalId = id;
   photoUrls = [];
   document.getElementById('photo-preview').innerHTML = '';
@@ -464,6 +491,7 @@ window.viewPhoto = url => {
 
 /* ══ TASKS ═══════════════════════════════════════════════════ */
 window.openTaskModal = (id = null) => {
+  if (!tasks) return; // Don't open if data isn't loaded
   editTaskId = id;
   document.getElementById('tmodal-title').textContent = id ? '✏️ Edit Task' : '✅ Add Task';
   if (id) {
@@ -727,6 +755,8 @@ function renderAll() {
     const fav = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
     document.getElementById('stat-mood').textContent = M_EMOJI[fav] || '😐';
   }
+
+  // ── use new renderJournals(containerId, limit, isDash) ──
   renderJournals('dash-journal-list', 3, true);
   renderJournals('journal-list');
 
@@ -745,34 +775,96 @@ function renderAll() {
   else applyProfileToUI();
 }
 
-/* ══ COMMUNITY FEED ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   COMMUNITY FEED
+══════════════════════════════════════════════════════════════ */
 function subscribeFeed() {
   if (feedUnsubscribe) return;
   const q = query(collection(db,'community_posts'), orderBy('createdAt','desc'), limit(60));
   feedUnsubscribe = onSnapshot(q, snap => {
     feedPosts = snap.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
-    window.feedPosts = feedPosts;
-    if (typeof window.renderFeed === 'function') window.renderFeed();
+    window.feedPosts = feedPosts; // Expose for debugging
+    renderFeed();
     updateCommStats();
     const activePage = document.querySelector('.page.active')?.id;
     if (activePage !== 'page-community' && snap.docChanges().some(c=>c.type==='added')) {
-      const dot = document.getElementById('new-posts-dot');
-      if (dot) dot.style.display = 'inline-block';
+      document.getElementById('new-posts-dot').style.display = 'inline-block';
     }
   }, () => {
-    const fl = document.getElementById('feed-list');
-    if (fl) fl.innerHTML = `<div class="loading-posts">Could not load feed. Check Firestore rules.</div>`;
+    document.getElementById('feed-list').innerHTML = `<div class="loading-posts">Could not load feed. Check Firestore rules.</div>`;
   });
 }
 
 function updateCommStats() {
-  const ps = document.getElementById('comm-stat-posts');
-  const ms = document.getElementById('comm-stat-members');
-  const ls = document.getElementById('comm-stat-likes');
-  if (ps) ps.textContent = feedPosts.length;
-  if (ms) ms.textContent = new Set(feedPosts.map(p=>p.authorId)).size;
-  if (ls) ls.textContent = feedPosts.reduce((s,p)=>s+(p.likes?.length||0),0);
+  document.getElementById('comm-stat-posts').textContent   = feedPosts.length;
+  document.getElementById('comm-stat-members').textContent = new Set(feedPosts.map(p=>p.authorId)).size;
+  document.getElementById('comm-stat-likes').textContent   = feedPosts.reduce((s,p)=>s+(p.likes?.length||0),0);
 }
+
+window.setComposerType = type => {
+  composerType = type;
+  document.querySelectorAll('.composer-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type===type));
+};
+
+window.postThought = async () => {
+  const text = document.getElementById('composer-text').value.trim();
+  if (!text) { toast('Write something first!','✍️'); return; }
+  try {
+    await addDoc(collection(db,'community_posts'), {
+      type:'thought', body:text, title:'',
+      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
+      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      likes:[], commentCount:0, createdAt:serverTimestamp()
+    });
+    document.getElementById('composer-text').value = '';
+    toast('Posted to community! 🌐','✨');
+  } catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.openShareModal = (type = 'journal') => {
+  if (!journals || !tasks || !goals) return; // Don't open if data isn't loaded
+  const body = document.getElementById('share-modal-body');
+  if (!body) return;
+  if (type==='journal') {
+    document.getElementById('share-modal-title').textContent = '📓 Share a Journal Entry';
+    const items = journals.slice(0,20);
+    body.innerHTML = items.length
+      ? `<p style="font-size:.8rem;color:var(--muted);margin-bottom:14px;font-family:'Newsreader',serif;font-style:italic">Choose an entry to share publicly.</p>
+         <div class="share-modal-items">${items.map(e=>`
+           <div class="share-item" onclick="shareJournal('${e.id}')">
+             <span class="share-item-icon">${e.moodEmoji||'📓'}</span>
+             <div class="share-item-info"><div class="share-item-title">${esc(e.title||'Untitled')}</div><div class="share-item-meta">${fmtDate(e.createdAt)}</div></div>
+             <span style="color:var(--accent);font-size:.75rem;font-weight:600">Share ↗</span>
+           </div>`).join('')}</div>`
+      : `<div class="empty-state"><div class="empty-icon">📓</div><div class="empty-text">No journal entries yet.</div></div>`;
+  }
+  if (type==='task') {
+    document.getElementById('share-modal-title').textContent = '✅ Share a Task';
+    const items = tasks.slice(0,20);
+    const PI = {high:'🔴',med:'🟡',low:'🟢'};
+    body.innerHTML = items.length
+      ? `<div class="share-modal-items">${items.map(t=>`
+           <div class="share-item" onclick="shareTask('${t.id}')">
+             <span class="share-item-icon">${PI[t.priority]||'✅'}</span>
+             <div class="share-item-info"><div class="share-item-title">${esc(t.text)}</div><div class="share-item-meta">${t.priority} · ${t.done?'Done ✓':'Pending'}</div></div>
+             <span style="color:var(--green);font-size:.75rem;font-weight:600">Share ↗</span>
+           </div>`).join('')}</div>`
+      : `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">No tasks yet.</div></div>`;
+  }
+  if (type==='goal') {
+    document.getElementById('share-modal-title').textContent = '🎯 Share a Goal';
+    const items = goals.slice(0,20);
+    body.innerHTML = items.length
+      ? `<div class="share-modal-items">${items.map(g=>`
+           <div class="share-item" onclick="shareGoal('${g.id}')">
+             <span class="share-item-icon">${CAT_ICONS[g.category]||'🎯'}</span>
+             <div class="share-item-info"><div class="share-item-title">${esc(g.name)}</div><div class="share-item-meta">${g.progress||0}% · ${esc(g.target||'')}</div></div>
+             <span style="color:var(--lavender);font-size:.75rem;font-weight:600">Share ↗</span>
+           </div>`).join('')}</div>`
+      : `<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">No goals yet.</div></div>`;
+  }
+  document.getElementById('share-modal').classList.add('open');
+};
 
 window.shareJournal = async id => {
   if (!currentUser) { toast('Please wait, user not ready.','⏳'); return; }
@@ -786,7 +878,7 @@ window.shareJournal = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Journal shared! 🌐','📓'); navigateTo('community');
+    toast('Journal shared! 🌐','📓'); navigate('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
@@ -801,7 +893,7 @@ window.shareTask = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Task shared! 🌐','✅'); navigateTo('community');
+    toast('Task shared! 🌐','✅'); navigate('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
@@ -815,8 +907,190 @@ window.shareGoal = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Goal shared! 🌐','🎯'); navigateTo('community');
+    toast('Goal shared! 🌐','🎯'); navigate('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+function renderFeed() {
+  const container = document.getElementById('feed-list');
+  let posts = [...feedPosts];
+  if (currentFeedFilter !== 'all') {
+    if (currentFeedFilter === 'mine') posts = posts.filter(p=>p.authorId===currentUser.uid);
+    else posts = posts.filter(p=>p.type===currentFeedFilter);
+  }
+  if (!posts.length) {
+    container.innerHTML = `<div class="feed-empty"><div class="empty-icon">🌱</div><div class="empty-title">Nothing here yet</div><div class="empty-sub">Be the first to share something!</div></div>`;
+    return;
+  }
+  container.innerHTML = posts.map(p => renderPostCard(p)).join('');
+
+  // The new delegated handler will not work for post actions (like, comment, etc.)
+  // because renderPostCard uses inline onclicks, not data-* attributes.
+  // The handler is set up to ignore these buttons and only handle expansion.
+  initExpandableCards(container);
+}
+
+function renderPostCard(p) {
+  const isOwn  = p.authorId === currentUser?.uid;
+  const liked  = (p.likes||[]).includes(currentUser?.uid);
+  const timeAgo = relativeTime(p.createdAt);
+  const badgeClass = TYPE_BADGE_CLASS[p.type]||'badge-journal';
+  const repostBadge = p.isRepost
+    ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(p.originalAuthorAvatar||'')}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"><span>${esc(p.originalAuthorName||'')}</span></div>` : '';
+
+  let typeHtml = '';
+  if (p.type === 'goal') {
+    typeHtml = `<div class="post-goal-bar"><div class="post-goal-fill" style="width:${p.progress||0}%"></div></div>
+      <div class="post-goal-meta"><span>${p.categoryIcon||'🎯'}</span><span>${p.progress||0}% complete</span></div>
+      ${p.body ? `<div class="post-body" style="margin-top:10px">${esc(p.body)}</div>` : ''}`;
+  } else if (p.type === 'task') {
+    typeHtml = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span>${p.priorityIcon||'✅'}</span>
+        <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>
+        ${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}
+      </div>
+      ${p.body ? `<div class="post-body">${esc(p.body)}</div>` : ''}`;
+  } else {
+    const isLong = (p.body||'').length > 300;
+    typeHtml = `<div class="post-body" id="post-body-${p.id}" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${esc(p.body||'')}</div>
+      ${isLong ? `<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${p.id}')" style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block">Read more ↓</span>` : ''}
+      ${p.moodEmoji ? `<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>` : ''}
+      ${p.photoUrls?.length ? `<div class="post-photos">${p.photoUrls.map(u=>`<img src="${u}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${u}')">`).join('')}</div>` : ''}
+      ${p.tags?.length ? `<div class="post-tags">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>` : ''}`;
+  }
+
+  return `<div class="post-card" id="post-card-${p.id}">
+    <div class="post-header">
+      <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+      <div class="post-meta">
+        <button class="post-author-btn" onclick="openUserProfileModal('${p.authorId}')">${esc(p.authorName||'Anonymous')}</button> <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}
+        <div class="post-time">${timeAgo}</div>
+      </div>
+      ${isOwn?`<button class="post-delete-btn" onclick="deletePost('${p.id}')">🗑️</button>`:''}
+    </div>
+    ${p.title ? `<div class="post-title">${esc(p.title)}</div>` : ''}
+    ${repostBadge}${typeHtml}
+    <div class="post-actions">
+      <button class="post-action-btn ${liked?'liked':''}" onclick="toggleLike('${p.id}')"><span class="heart-icon">${liked?'❤️':'🤍'}</span><span class="post-action-count">${(p.likes||[]).length||''}</span></button>
+      <button class="post-action-btn" onclick="toggleComments('${p.id}')">💬 <span class="post-action-count" id="comment-count-${p.id}">${p.commentCount||0}</span></button>
+      <button class="post-action-btn" onclick="repost('${p.id}')">🔁 <span class="post-action-count">${p.repostCount||''}</span></button>
+    </div>
+    <div class="comments-section" id="comments-${p.id}" style="display:none">
+      <div id="comments-list-${p.id}"><div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div></div>
+      <div class="comment-input-row">
+        <img src="${esc(currentUser?.photoURL||'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff')}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
+        <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${p.id}')}">
+        <button class="comment-submit" onclick="submitComment('${p.id}')">↵</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+window.toggleReadMore = id => {
+  const el = document.getElementById('post-body-'+id);
+  const btn = el?.nextElementSibling;
+  if (!el||!btn) return;
+  const isExpanded = el.style.webkitLineClamp === 'unset';
+  if (isExpanded) {
+    el.style.webkitLineClamp = '4';
+    el.style.overflow = 'hidden';
+    btn.textContent = 'Read more ↓';
+  } else {
+    el.style.webkitLineClamp = 'unset';
+    el.style.overflow = 'visible';
+    btn.textContent = 'Show less ↑';
+  }
+};
+
+window.toggleLike = async postId => {
+  const post = feedPosts.find(p=>p.id===postId); if (!post) return;
+  const uid = currentUser.uid, liked = (post.likes||[]).includes(uid);
+  try { await updateDoc(doc(db,'community_posts',postId), { likes: liked ? arrayRemove(uid) : arrayUnion(uid) }); }
+  catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.deletePost = async postId => {
+  if (!confirm('Delete this post?')) return;
+  try { await deleteDoc(doc(db,'community_posts',postId)); toast('Post deleted','🗑️'); }
+  catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.toggleComments = async postId => {
+  const section = document.getElementById('comments-'+postId); if (!section) return;
+  const isOpen = section.style.display !== 'none';
+  section.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) await loadComments(postId);
+};
+
+async function loadComments(postId) {
+  const listEl = document.getElementById('comments-list-'+postId); if (!listEl) return;
+  try {
+    const snap = await getDocs(query(collection(db,'community_posts',postId,'comments'), orderBy('createdAt','asc')));
+    const comments = snap.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
+    renderComments(postId, comments);
+  } catch { listEl.innerHTML = `<div style="font-size:.72rem;color:var(--muted);padding:8px">Could not load comments.</div>`; }
+}
+
+function renderComments(postId, comments) {
+  const listEl = document.getElementById('comments-list-'+postId); if (!listEl) return;
+  if (!comments.length) { listEl.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);padding:8px 0">No comments yet.</div>`; return; }
+  listEl.innerHTML = comments.map(c => `
+    <div class="comment-item">
+      <img src="${esc(c.authorAvatar||'')}" class="comment-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+      <div class="comment-bubble">
+        <div class="comment-author"><span>${esc(c.authorName||'Anonymous')}</span>${c.authorId===currentUser?.uid?`<button class="comment-del" onclick="deleteComment('${postId}','${c.id}')">✕</button>`:''}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">${relativeTime(c.createdAt)}</div>
+        <div class="comment-text">${esc(c.text)}</div>
+      </div>
+    </div>`).join('');
+}
+
+window.submitComment = async postId => {
+  const input = document.getElementById('comment-input-'+postId);
+  const text = input?.value.trim(); if (!text) return;
+  input.value = '';
+  try {
+    await addDoc(collection(db,'community_posts',postId,'comments'), {
+      text, authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
+      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      createdAt:serverTimestamp()
+    });
+    await updateDoc(doc(db,'community_posts',postId), {commentCount:increment(1)});
+    await loadComments(postId);
+    const countEl = document.getElementById('comment-count-'+postId);
+    if (countEl) countEl.textContent = parseInt(countEl.textContent||0)+1;
+  } catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.deleteComment = async (postId, commentId) => {
+  try {
+    await deleteDoc(doc(db,'community_posts',postId,'comments',commentId));
+    await updateDoc(doc(db,'community_posts',postId), {commentCount:increment(-1)});
+    await loadComments(postId);
+  } catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.repost = async postId => {
+  const post = feedPosts.find(p=>p.id===postId); if (!post) return;
+  if (post.authorId === currentUser.uid) { toast('Cannot repost your own post','⚠️'); return; }
+  try {
+    await addDoc(collection(db,'community_posts'), {
+      ...post, id:undefined, isRepost:true,
+      originalAuthorName:post.authorName, originalAuthorAvatar:post.authorAvatar,
+      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
+      authorAvatar:currentUser.photoURL||'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff',
+      likes:[], commentCount:0, repostCount:0, createdAt:serverTimestamp()
+    });
+    await updateDoc(doc(db,'community_posts',postId), {repostCount:increment(1)});
+    toast('Reposted! 🔁','✨');
+  } catch(e) { toast('Error: '+e.message,'❌'); }
+};
+
+window.filterFeed = (filter, btn) => {
+  currentFeedFilter = filter;
+  document.querySelectorAll('.feed-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFeed();
 };
 
 function relativeTime(date) {
@@ -832,7 +1106,9 @@ function relativeTime(date) {
   return new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
 
-/* ══ PROFILE SYSTEM ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   PROFILE SYSTEM
+══════════════════════════════════════════════════════════════ */
 async function loadUserProfile() {
   if (!currentUser) return;
   try {
@@ -849,7 +1125,6 @@ async function loadUserProfile() {
       };
       await setUserProfile(userProfile);
     }
-    window.userProfile = userProfile;
     applyProfileToUI();
   } catch(e) { console.warn('Profile load:', e.message); }
 }
@@ -861,13 +1136,11 @@ async function setUserProfile(data) {
 
 function applyProfileToUI() {
   const p = userProfile;
-  window.userProfile = userProfile;
   const av = p.avatarUrl || currentUser?.photoURL ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(p.displayName||'U')}&background=4f8ef7&color=fff`;
   document.getElementById('user-name').textContent = p.displayName || currentUser?.displayName || '—';
   document.getElementById('user-avatar').src = av;
-  const compAv = document.getElementById('composer-avatar');
-  if (compAv) compAv.src = av;
+  document.getElementById('composer-avatar').src = av;
 
   const el = id => document.getElementById(id);
   if (el('profile-avatar-large'))      el('profile-avatar-large').src = av;
@@ -900,18 +1173,21 @@ function applyProfileToUI() {
 
 function renderProfilePage() {
   applyProfileToUI();
+
   const postsEl = document.getElementById('profile-my-posts');
   if (!postsEl) return;
+
+  // Check privacy setting from the pre-loaded userProfile object. Default to public.
   const isPublic = userProfile.isPublic !== false;
+
   if (isPublic) {
     const myPosts = feedPosts.filter(p => p.authorId === currentUser?.uid);
-    if (myPosts.length && typeof window.renderPostCard === 'function') {
-      postsEl.innerHTML = myPosts.map(p => window.renderPostCard(p)).join('');
-    } else if (!myPosts.length) {
-      postsEl.innerHTML = `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🌐</div><div class="empty-title">No posts yet</div><div class="empty-sub">Share something with the community!</div><button class="btn btn-primary" style="margin-top:16px" onclick="navigateTo('community')">Go to Community</button></div>`;
-    }
+    postsEl.innerHTML = myPosts.length
+      ? myPosts.map(p => renderPostCard(p)).join('')
+      : `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🌐</div><div class="empty-title">No posts yet</div><div class="empty-sub">Share something with the community!</div><button class="btn btn-primary" style="margin-top:16px" onclick="navigate('community')">Go to Community</button></div>`;
   } else {
-    postsEl.innerHTML = `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🔒</div><div class="empty-title">This Profile is Private</div></div>`;
+    // If profile is private, show a message instead of the posts.
+    postsEl.innerHTML = `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🔒</div><div class="empty-title">This Profile is Private</div><div class="empty-sub">This user's activity is not shared publicly.</div></div>`;
   }
 }
 
@@ -969,53 +1245,87 @@ window.saveAvatar = async () => {
   catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
-/* ══ COVER MODAL ═════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   COVER MODAL  —  hex-based gradient generator
+══════════════════════════════════════════════════════════════ */
 window.openCoverModal = () => {
   selectedCoverData = { value: userProfile.coverGradient || COVER_PRESETS[0] };
+
+  // Preset grid
   const grid = document.getElementById('cover-preset-grid');
-  grid.innerHTML = COVER_PRESETS.map((grad) =>
+  grid.innerHTML = COVER_PRESETS.map((grad, i) =>
     `<div class="cover-preset ${userProfile.coverGradient===grad?'selected':''}"
       style="background:${grad}" onclick="selectCoverPreset('${grad}',this)"></div>`
   ).join('');
+
+  // Live preview
   document.getElementById('cover-live-preview').style.background = selectedCoverData.value;
   document.getElementById('hex-text-input').value = '';
   document.getElementById('hex-color-wheel').value = '#4f8ef7';
+
+  // Sync color wheel → text input → live preview
   const wheel = document.getElementById('hex-color-wheel');
   const textIn = document.getElementById('hex-text-input');
-  wheel.oninput = () => { textIn.value = wheel.value; previewHexGradient(wheel.value); };
+  wheel.oninput = () => {
+    textIn.value = wheel.value;
+    previewHexGradient(wheel.value);
+  };
   textIn.oninput = () => {
     const hex = textIn.value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) { wheel.value = hex; previewHexGradient(hex); }
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+      wheel.value = hex;
+      previewHexGradient(hex);
+    }
   };
+
   document.getElementById('cover-modal').classList.add('open');
 };
 
 function hexToRgb(hex) {
-  return { r:parseInt(hex.slice(1,3),16), g:parseInt(hex.slice(3,5),16), b:parseInt(hex.slice(5,7),16) };
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
 }
+
 function darken(hex, factor) {
   const {r,g,b} = hexToRgb(hex);
   const d = v => Math.round(Math.max(0, v*factor)).toString(16).padStart(2,'0');
   return `#${d(r)}${d(g)}${d(b)}`;
 }
+
 function hexToGradient(hex) {
-  return `linear-gradient(135deg,${darken(hex,0.18)},${darken(hex,0.55)},${darken(hex,0.1)})`;
+  // Build: very dark base → mid tone of user color → ultra dark
+  const mid  = darken(hex, 0.55);  // 55% brightness of user color
+  const dark = darken(hex, 0.18);  // very dark tint
+  const ultra = darken(hex, 0.1);
+  return `linear-gradient(135deg,${dark},${mid},${ultra})`;
 }
+
 function previewHexGradient(hex) {
   const grad = hexToGradient(hex);
   document.getElementById('cover-live-preview').style.background = grad;
+  // Deselect presets
   document.querySelectorAll('.cover-preset').forEach(p=>p.classList.remove('selected'));
   selectedCoverData = { value: grad };
 }
+
 window.applyHexCover = () => {
   const textIn = document.getElementById('hex-text-input');
   const wheel  = document.getElementById('hex-color-wheel');
   let hex = textIn.value.trim();
-  if (/^#[0-9a-fA-F]{3}$/.test(hex)) hex = '#'+hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) hex = wheel.value;
+  // Accept shorthand like #fff → #ffffff
+  if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+    hex = '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    // Fall back to color wheel
+    hex = wheel.value;
+  }
   previewHexGradient(hex);
   toast('Preview updated!','🎨');
 };
+
 window.selectCoverPreset = (grad, el) => {
   selectedCoverData = { value: grad };
   document.querySelectorAll('.cover-preset').forEach(p=>p.classList.remove('selected'));
@@ -1035,8 +1345,45 @@ window.saveCover = async () => {
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
-/* ══ SETTINGS ════════════════════════════════════════════════ */
-window.exportUserData = () => { exportAsJSON(); };
+/* ══════════════════════════════════════════════════════════════
+   SETTINGS PAGE HANDLERS
+══════════════════════════════════════════════════════════════ */
+// NOTE: These are placeholder handlers for a potential future settings page.
+// Much of this functionality is already implemented in the Profile page modals.
+
+window.renderSettingsPage = () => {
+    console.log("Rendering settings page...");
+    // This is a placeholder. A real implementation would populate
+    // form fields on a dedicated #page-settings element.
+};
+
+// Corresponds to existing saveProfile()
+window.saveProfileSettings = async () => {
+    alert('Profile settings saved! (Placeholder)');
+    // In a real implementation, this would read from settings page inputs
+    // and call setUserProfile().
+};
+
+// Corresponds to existing saveAvatar() and saveCover()
+window.saveAppearanceSettings = () => {
+    alert('Appearance settings saved! (Placeholder)');
+};
+
+// Corresponds to existing exportAsJSON()
+window.exportUserData = () => {
+    exportAsJSON();
+};
+
+// New functionality: Account deletion
+window.deleteUserData = () => {
+    if (!confirm('Are you absolutely sure you want to delete your account and all data? This action cannot be undone.')) {
+        return;
+    }
+    // DANGER: This is a placeholder. A real implementation would require a
+    // secure, multi-step process, likely involving a backend function
+    // to delete all user data from Firestore and then delete the auth user.
+    alert('Your account is being deleted. You will be logged out. (Placeholder)');
+};
 
 /* ══ IMAGE COMPRESSION ════════════════════════════════════════ */
 function compressImageTo(file, targetBytes) {
@@ -1074,6 +1421,98 @@ document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('cl
   if (e.target === m) m.classList.remove('open');
 }));
 
+window.openUserProfileModal = async (userId) => {
+  console.log('[Debug] openUserProfileModal called for userId:', userId);
+  if (!userId) {
+    console.log('[Debug] No userId provided, returning.');
+    return;
+  }
+  const modal = document.getElementById('user-profile-modal');
+  if (!modal) {
+    console.log('[Debug] user-profile-modal element not found, returning.');
+    return;
+  }
+
+  // Reset and show loading state
+  modal.classList.add('open');
+  document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div>';
+  document.getElementById('upm-name').textContent = 'Loading...';
+  document.getElementById('upm-username').textContent = '';
+  document.getElementById('upm-bio').textContent = '';
+  document.getElementById('upm-avatar').src = '';
+  document.getElementById('upm-cover').style.background = '';
+  document.getElementById('upm-stat-posts').textContent = '—';
+  document.getElementById('upm-stat-likes').textContent = '—';
+  document.getElementById('upm-stat-joined').textContent = '—';
+
+  try {
+    console.log(`[Debug] Fetching user document: users/${userId}`);
+    const userSnap = await getDoc(doc(db, 'users', userId));
+
+    if (!userSnap.exists()) {
+      console.log('[Debug] User document does not exist.');
+      document.getElementById('upm-name').textContent = 'User Not Found';
+      document.getElementById('upm-username').textContent = `@unknown_user`;
+      document.getElementById('upm-bio').textContent = 'This user profile could not be loaded. The user may have been deleted.';
+      document.getElementById('upm-avatar').src = 'https://ui-avatars.com/api/?name=?&background=374151&color=fff';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🤷‍♂️</div>';
+      return;
+    }
+
+    const userProfile = userSnap.data();
+    console.log('[Debug] User profile data fetched:', userProfile);
+
+    // Assume public profile data is stored directly on the user document
+    const isPublic = userProfile.isPublic !== false;
+    console.log('[Debug] Is profile public?', isPublic);
+
+    if (!isPublic) {
+      document.getElementById('upm-name').textContent = 'Profile is Private';
+      document.getElementById('upm-bio').textContent = 'This user prefers to keep things private.';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🔒</div>';
+      return;
+    }
+
+    // Populate modal with user data
+    document.getElementById('upm-name').textContent = userProfile.displayName || 'Anonymous';
+    document.getElementById('upm-username').textContent = userProfile.username ? `@${userProfile.username}` : '';
+    document.getElementById('upm-bio').textContent = userProfile.bio || 'No bio yet.';
+    document.getElementById('upm-avatar').src = userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.displayName||'U')}&background=4f8ef7&color=fff`;
+    document.getElementById('upm-cover').style.background = userProfile.coverGradient || 'linear-gradient(135deg, #0d1b2a, #1b3a5c)';
+    document.getElementById('upm-stat-joined').textContent = userProfile.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('en-us', { month: 'short', year: 'numeric' }) : '—';
+
+    // Load user's posts and stats
+    const postsQuery = query(collection(db, 'community_posts'), where('authorId', '==', userId), orderBy('createdAt', 'desc'), limit(10));
+    const postsSnap = await getDocs(postsQuery);
+    const userPosts = postsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    document.getElementById('upm-stat-posts').textContent = userPosts.length;
+    const totalLikes = userPosts.reduce((acc, post) => acc + (post.likes?.length || 0), 0);
+    document.getElementById('upm-stat-likes').textContent = totalLikes;
+
+    const postsListEl = document.getElementById('upm-posts-list');
+    if (userPosts.length === 0) {
+      postsListEl.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No recent posts.</div>';
+    } else {
+      postsListEl.innerHTML = userPosts.map(p => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <a href="#" onclick="event.preventDefault(); closeUserProfileModal(); openExpandedPost('${p.id}');" style="color:var(--text);text-decoration:none;font-weight:600">${esc(p.title || p.body.substring(0, 50) + '...')}</a>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:3px">${relativeTime(p.createdAt)}</div>
+        </div>
+      `).join('');
+    }
+
+  } catch (error) {
+    console.error("Error loading user profile:", error);
+    console.log('[Debug] An error occurred in openUserProfileModal:', error);
+    document.getElementById('upm-name').textContent = 'Error loading profile';
+  }
+};
+
+window.closeUserProfileModal = () => {
+  const modal = document.getElementById('user-profile-modal');
+  if (modal) modal.classList.remove('open');
+};
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1089,28 +1528,333 @@ window.toast = (msg, icon='✨') => {
   setTimeout(() => { t.classList.add('out'); setTimeout(()=>t.remove(), 300); }, 3000);
 };
 
-/* ══ LEARNING RESOURCES ══════════════════════════════════════ */
+// ─── GLOBAL EXPANDED POST HANDLER ─────────────────────────
+window.openExpandedPost = function(postId) {
+  if(!postId || !window.feedPosts) return;
+  const p = window.feedPosts.find(x => x.id === postId);
+  if(!p) return;
+
+  window._expandedPostId = postId;
+  const cu = window.currentUser;
+  const isOwn = p.authorId === cu?.uid;
+  const liked = (p.likes||[]).includes(cu?.uid);
+
+  // Type badges (from main JS)
+  const TYPE_BADGES = {thought:'💭 Thought',journal:'📓 Journal',task:'✅ Task',goal:'🎯 Goal'};
+  const TYPE_BADGE_CLASS = {thought:'badge-journal',journal:'badge-journal',task:'badge-task',goal:'badge-goal'};
+  const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
+
+  // Try profile page overlay first, then community page overlay
+  const profileOverlay = document.getElementById('post-expand-overlay');
+  const communityOverlay = document.getElementById('post-expand-overlay-comm');
+  const overlay = profileOverlay || communityOverlay;
+  const prefix = profileOverlay ? 'pexp' : 'exp';
+
+  if(!overlay) return; // No overlay available
+
+  // Set up header
+  const avatarEl = document.getElementById(prefix + '-avatar');
+  const timeEl = document.getElementById(prefix + '-time');
+  const authorEl = document.getElementById(prefix + '-author-row');
+  
+  if(avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
+  if(timeEl) timeEl.textContent = new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year: new Date(p.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined});
+  
+  if(authorEl) {
+    const handleFromPost = p.authorUsername || (p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user';
+    authorEl.innerHTML = `
+      <button class="post-author-btn"
+              onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
+              style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;
+                     display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .2s"
+              onmouseover="this.style.color='var(--accent)'"
+              onmouseout="this.style.color=''">
+        <span style="font-size:.82rem;font-weight:700;color:var(--text)">${esc(p.authorName||'Anonymous')}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">@${esc(handleFromPost)}</span>
+      </button>
+      <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>
+      ${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>` : ''}`;
+  }
+
+  // Build body HTML
+  let bodyHtml = '';
+  if(p.title) bodyHtml += `<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3">${esc(p.title)}</div>`;
+
+  if(p.type === 'goal'){
+    bodyHtml += `<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px">
+      <div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${p.progress||0}%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px">
+      <span>${p.categoryIcon||'🎯'} ${esc(p.title||'')}</span><span>${p.progress||0}% complete</span>
+    </div>
+    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
+  } else if(p.type === 'task'){
+    bodyHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span>${p.priorityIcon||'✅'}</span>
+      <span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>
+      ${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}
+    </div>
+    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
+  } else {
+    if(p.moodEmoji) bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`;
+    bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.85;color:rgba(232,234,240,.85);font-weight:300;white-space:pre-wrap;word-break:break-word">${esc(p.body||'')}</div>`;
+    if(p.photoUrls?.length) bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${p.photoUrls.map(u=>`<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`;
+    if(p.tags?.length) bodyHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`;
+  }
+
+  // Comments section
+  const myAvatar = cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
+  bodyHtml += `<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+    <div id="${prefix}-comments-list" style="margin-bottom:12px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div>
+    </div>
+    <div class="comment-input-row">
+      <img src="${esc(myAvatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
+      <input class="comment-input" id="${prefix}-comment-input" placeholder="Write a comment…"
+             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
+      <button class="comment-submit" onclick="window._submitCommentGlobal('${postId}')">↵</button>
+    </div>
+  </div>`;
+
+  const bodyEl = document.getElementById(prefix + '-body');
+  if(bodyEl) bodyEl.innerHTML = bodyHtml;
+
+  // Footer with actions
+  const footerEl = document.getElementById(prefix + '-footer');
+  if(footerEl) {
+    footerEl.innerHTML = `
+      <button class="post-action-btn ${liked?'liked':''}" id="${prefix}-like-btn"
+              onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
+        <span class="heart-icon">${liked?'❤️':'🤍'}</span>
+        <span id="${prefix}-like-count" class="post-action-count">${(p.likes||[]).length||''}</span>
+      </button>
+      <button class="post-action-btn" onclick="event.stopPropagation();repost('${postId}')">
+        🔁 <span class="post-action-count">${p.repostCount||''}</span>
+      </button>
+      ${isOwn ? `<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>` : ''}`;
+  }
+
+  // Show overlay
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Load comments
+  window._loadCommentsGlobal(postId);
+};
+
+window.closeExpandedPost = function() {
+  const profileOverlay = document.getElementById('post-expand-overlay');
+  const communityOverlay = document.getElementById('post-expand-overlay-comm');
+  const overlay = profileOverlay || communityOverlay;
+  if(overlay) overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  window._expandedPostId = null;
+};
+
+// Global comment helpers
+window._submitCommentGlobal = async function(postId) {
+  const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
+  const input = document.getElementById(prefix + '-comment-input');
+  const text = input.value.trim();
+  if(!text) return;
+
+  const user = window.auth.currentUser;
+  if(!user) { window.toast && window.toast('Not logged in', '⚠️'); return; }
+
+  try {
+    const { collection, addDoc, serverTimestamp } = window._fbFS;
+    await addDoc(collection(window.db, 'community_posts', postId, 'comments'), {
+      authorId:   user.uid,
+      authorName: user.displayName || 'Anonymous',
+      authorAvatar: user.photoURL || '',
+      text:       text,
+      createdAt:  serverTimestamp(),
+      likes:      []
+    });
+    input.value = '';
+    window._loadCommentsGlobal(postId);
+  } catch(e) {
+    console.error(e);
+    window.toast && window.toast('Error posting comment', '🔥');
+  }
+};
+
+window._loadCommentsGlobal = function(postId) {
+  if(!window.db) return;
+  const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
+  const { collection, query, orderBy, onSnapshot } = window._fbFS;
+  const q = query(
+    collection(window.db, 'community_posts', postId, 'comments'),
+    orderBy('createdAt', 'asc')
+  );
+  onSnapshot(q, snap => {
+    const comments = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    const list = document.getElementById(prefix + '-comments-list');
+    if(!list) return;
+    
+    if(!comments.length){
+      list.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;
+                             color:var(--muted);text-align:center;padding:8px">No comments yet. Start the conversation!</div>`;
+    } else {
+      list.innerHTML = comments.map(c => `
+        <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <img src="${esc(c.authorAvatar)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+              <span style="font-weight:600;font-size:.8rem">${esc(c.authorName)}</span>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)">${relC(c.createdAt)}</span>
+          </div>
+          <div style="font-size:.85rem;color:rgba(232,234,240,.8);line-height:1.6;margin-left:32px">${esc(c.text)}</div>
+        </div>`).join('');
+    }
+  });
+};
+
+window._toggleLikeGlobal = async function(postId) {
+  const user = window.auth.currentUser;
+  if(!user) return;
+
+  const p = window.feedPosts?.find(x => x.id === postId);
+  if(!p) return;
+
+  const isLiked = (p.likes||[]).includes(user.uid);
+  const newLikes = isLiked 
+    ? (p.likes||[]).filter(id => id !== user.uid)
+    : [...(p.likes||[]), user.uid];
+
+  try {
+    const { doc, updateDoc } = window._fbFS;
+    await updateDoc(doc(window.db, 'community_posts', postId), { likes: newLikes });
+  } catch(e) {
+    console.error(e);
+  }
+};
+
+// ─── LEARNING RESOURCES INITIALIZATION ──────────────────
 let learningResourcesInitialized = false;
 async function initializeLearningResources() {
   if (learningResourcesInitialized) return;
   learningResourcesInitialized = true;
+
   try {
-    const snap = await getDocs(collection(db,'learning_resources'));
-    if (snap.docs.length > 0) return;
+    const { collection, getDocs } = window._fbFS;
+    const snap = await getDocs(collection(window.db, 'learning_resources'));
+    
+    // If resources already exist, skip initialization
+    if(snap.docs.length > 0) return;
+
+    // Initialize with sample learning resources
+    const { addDoc } = window._fbFS;
     const sampleResources = [
-      { title:'Python for Data Science', type:'course', platform:'Coursera', difficulty:'Intermediate', rating:4.8, link:'https://coursera.org/learn/python-for-data-science', description:'Complete Python course for data science applications', tags:['python','data science','programming'] },
-      { title:'Learn Machine Learning', type:'course', platform:'Coursera', difficulty:'Advanced', rating:4.9, link:'https://coursera.org/specializations/machine-learning', description:'Deep dive into ML algorithms and applications', tags:['machine learning','ai','data science'] },
-      { title:'Web Development Bootcamp', type:'course', platform:'Udemy', difficulty:'Beginner', rating:4.7, link:'https://udemy.com/web-development', description:'Full stack web development from scratch', tags:['web development','javascript','html','css'] },
-      { title:'React.js Tutorial', type:'tutorial', platform:'YouTube', difficulty:'Intermediate', rating:4.6, link:'https://youtube.com/react-tutorial', description:'Learn modern React development', tags:['react','javascript','web development'] },
-      { title:'The Complete SQL Bootcamp', type:'course', platform:'Udemy', difficulty:'Beginner', rating:4.8, link:'https://udemy.com/sql-bootcamp', description:'Master SQL and database design', tags:['sql','database','programming'] },
-      { title:'AI Engineering Guide', type:'article', platform:'Medium', difficulty:'Intermediate', rating:4.5, link:'https://medium.com/ai-engineering', description:'Best practices for AI engineering', tags:['ai','machine learning','engineering'] },
-      { title:'Cloud Computing with AWS', type:'course', platform:'Linux Academy', difficulty:'Intermediate', rating:4.7, link:'https://linuxacademy.com/aws', description:'AWS cloud services and deployment', tags:['aws','cloud','devops'] },
-      { title:'JavaScript ES6+ Guide', type:'article', platform:'Dev.to', difficulty:'Intermediate', rating:4.6, link:'https://dev.to/javascript', description:'Modern JavaScript best practices', tags:['javascript','programming','web development'] },
-      { title:'UI/UX Design Principles', type:'course', platform:'Skillshare', difficulty:'Beginner', rating:4.7, link:'https://skillshare.com/ui-ux', description:'Fundamentals of UI/UX design', tags:['design','ui','ux'] },
-      { title:'Git & GitHub Essentials', type:'tutorial', platform:'GitHub Learning', difficulty:'Beginner', rating:4.8, link:'https://github.com/skills', description:'Version control and collaboration', tags:['git','github','programming'] }
+      {
+        title: 'Python for Data Science',
+        type: 'course',
+        platform: 'Coursera',
+        difficulty: 'Intermediate',
+        rating: 4.8,
+        link: 'https://coursera.org/learn/python-for-data-science',
+        description: 'Complete Python course for data science applications',
+        tags: ['python', 'data science', 'programming']
+      },
+      {
+        title: 'Learn Machine Learning',
+        type: 'course',
+        platform: 'Coursera',
+        difficulty: 'Advanced',
+        rating: 4.9,
+        link: 'https://coursera.org/specializations/machine-learning',
+        description: 'Deep dive into ML algorithms and applications',
+        tags: ['machine learning', 'ai', 'data science']
+      },
+      {
+        title: 'Web Development Bootcamp',
+        type: 'course',
+        platform: 'Udemy',
+        difficulty: 'Beginner',
+        rating: 4.7,
+        link: 'https://udemy.com/web-development',
+        description: 'Full stack web development from scratch',
+        tags: ['web development', 'javascript', 'html', 'css']
+      },
+      {
+        title: 'React.js Tutorial',
+        type: 'tutorial',
+        platform: 'YouTube',
+        difficulty: 'Intermediate',
+        rating: 4.6,
+        link: 'https://youtube.com/react-tutorial',
+        description: 'Learn modern React development',
+        tags: ['react', 'javascript', 'web development']
+      },
+      {
+        title: 'The Complete SQL Bootcamp',
+        type: 'course',
+        platform: 'Udemy',
+        difficulty: 'Beginner',
+        rating: 4.8,
+        link: 'https://udemy.com/sql-bootcamp',
+        description: 'Master SQL and database design',
+        tags: ['sql', 'database', 'programming']
+      },
+      {
+        title: 'AI Engineering Guide',
+        type: 'article',
+        platform: 'Medium',
+        difficulty: 'Intermediate',
+        rating: 4.5,
+        link: 'https://medium.com/ai-engineering',
+        description: 'Best practices for AI engineering',
+        tags: ['ai', 'machine learning', 'engineering']
+      },
+      {
+        title: 'Cloud Computing with AWS',
+        type: 'course',
+        platform: 'Linux Academy',
+        difficulty: 'Intermediate',
+        rating: 4.7,
+        link: 'https://linuxacademy.com/aws',
+        description: 'AWS cloud services and deployment',
+        tags: ['aws', 'cloud', 'devops']
+      },
+      {
+        title: 'JavaScript ES6+ Guide',
+        type: 'article',
+        platform: 'Dev.to',
+        difficulty: 'Intermediate',
+        rating: 4.6,
+        link: 'https://dev.to/javascript',
+        description: 'Modern JavaScript best practices',
+        tags: ['javascript', 'programming', 'web development']
+      },
+      {
+        title: 'UI/UX Design Principles',
+        type: 'course',
+        platform: 'Skillshare',
+        difficulty: 'Beginner',
+        rating: 4.7,
+        link: 'https://skillshare.com/ui-ux',
+        description: 'Fundamentals of UI/UX design',
+        tags: ['design', 'ui', 'ux']
+      },
+      {
+        title: 'Git & GitHub Essentials',
+        type: 'tutorial',
+        platform: 'GitHub Learning',
+        difficulty: 'Beginner',
+        rating: 4.8,
+        link: 'https://github.com/skills',
+        description: 'Version control and collaboration',
+        tags: ['git', 'github', 'programming']
+      }
     ];
-    for (const resource of sampleResources) {
-      await addDoc(collection(db,'learning_resources'), resource);
+
+    for(const resource of sampleResources) {
+      await addDoc(collection(window.db, 'learning_resources'), resource);
     }
-  } catch(e) { console.warn('Error initializing learning resources:', e.message); }
+
+    console.log('Learning resources initialized');
+  } catch(e) {
+    console.warn('Error initializing learning resources:', e.message);
+  }
 }
