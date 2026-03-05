@@ -25,12 +25,12 @@
     @csrf
     <input type="hidden" id="resumeMarkdown">
 
-    <div class="grid-2" style="align-items:start;gap:20px">
+    <div style="display:grid;grid-template-columns:420px 1fr;align-items:start;gap:20px;min-width:0">
 
       {{-- ══════════════════════════════════════
            LEFT — Inputs + Preview
       ══════════════════════════════════════ --}}
-      <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
 
         {{-- Upload card --}}
         <div class="ra-card">
@@ -126,7 +126,7 @@
       {{-- ══════════════════════════════════════
            RIGHT — Results
       ══════════════════════════════════════ --}}
-      <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
 
         {{-- Empty state --}}
         <div id="ra-empty" class="ra-card ra-empty-state">
