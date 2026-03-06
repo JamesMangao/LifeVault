@@ -5,7 +5,6 @@
       <div class="page-title">🪞 Shadow Self <span style="background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Analyzer</span></div>
       <div class="page-subtitle">Uncover hidden patterns and recurring shadows in your inner world</div>
     </div>
-    {{-- FIX 1: Added missing onclick="analyzeShadowSelf()" --}}
     <button class="btn" id="shadow-analyze-btn"
             onclick="analyzeShadowSelf()"
             style="background:linear-gradient(135deg,rgba(248,113,113,.15),rgba(167,139,250,.15));border-color:rgba(248,113,113,.35);color:var(--rose);font-weight:700">
@@ -67,7 +66,13 @@
         <div id="shadow-summary-title" style="font-size:.95rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px"></div>
         <div id="shadow-summary-text" style="font-family:'Newsreader',serif;font-size:.85rem;color:rgba(232,234,240,.75);font-weight:300;line-height:1.65"></div>
       </div>
-      <button class="btn" onclick="analyzeShadowSelf()" style="font-size:.75rem;flex-shrink:0">🔄 Re-analyze</button>
+      <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+        <button class="btn" onclick="analyzeShadowSelf()" style="font-size:.75rem">🔄 Re-analyze</button>
+        <button class="btn" id="shadow-save-btn" onclick="saveShadowToSaved()"
+                style="font-size:.75rem;border-color:rgba(248,113,113,.35);color:var(--rose);background:rgba(248,113,113,.08)">
+          🔖 Save Analysis
+        </button>
+      </div>
     </div>
 
     {{-- Patterns Grid --}}
@@ -103,8 +108,15 @@
 
 @push('scripts')
 <script>
+(function () {
+'use strict';
+
+/* ── Session key ──────────────────────────────────────────── */
+const SHADOW_KEY = 'shadow_last_analysis';
+
 let shadowAnalysis = null;
 
+/* ── Loading step animation ───────────────────────────────── */
 function animateShadowSteps() {
   const steps = [
     'Scanning journal entries…',
@@ -119,6 +131,7 @@ function animateShadowSteps() {
   return setInterval(() => { if (el) el.textContent = steps[i++ % steps.length]; }, 1500);
 }
 
+/* ── Main analyze function ────────────────────────────────── */
 window.analyzeShadowSelf = async () => {
   const entries = (window.journals || []).slice(0, 30);
   if (entries.length < 3) {
@@ -131,9 +144,12 @@ window.analyzeShadowSelf = async () => {
   document.getElementById('shadow-loading').style.display = 'block';
   document.getElementById('shadow-analyze-btn').disabled  = true;
 
+  /* Reset save button */
+  const saveBtn = document.getElementById('shadow-save-btn');
+  if (saveBtn) { saveBtn.textContent = '🔖 Save Analysis'; saveBtn.disabled = false; saveBtn.style.opacity = '1'; }
+
   const stepInterval = animateShadowSteps();
 
-  // FIX 3: Send structured entries array — matches controller's validate() rules
   const formattedEntries = entries.map(e => ({
     title:     e.title     || 'Untitled',
     content:   e.content   || '',
@@ -142,7 +158,6 @@ window.analyzeShadowSelf = async () => {
   }));
 
   try {
-    // FIX 2: Correct route → /ai/shadow-self/analyze
     const response = await fetch('/ai/shadow-self/analyze', {
       method: 'POST',
       headers: {
@@ -159,7 +174,6 @@ window.analyzeShadowSelf = async () => {
       throw new Error(err.error || `HTTP ${response.status}`);
     }
 
-    // FIX 4: Controller returns { success: true, data: {...} } — not { content } or { text }
     const json = await response.json();
 
     if (!json.success || !json.data) {
@@ -167,6 +181,10 @@ window.analyzeShadowSelf = async () => {
     }
 
     shadowAnalysis = json.data;
+
+    /* ── Persist to sessionStorage ──────────────────────────── */
+    try { sessionStorage.setItem(SHADOW_KEY, JSON.stringify(shadowAnalysis)); } catch (e) {}
+
     renderShadowResults(shadowAnalysis);
 
     document.getElementById('shadow-loading').style.display = 'none';
@@ -183,6 +201,56 @@ window.analyzeShadowSelf = async () => {
   }
 };
 
+/* ── Save to Saved Items ──────────────────────────────────── */
+window.saveShadowToSaved = () => {
+  if (!shadowAnalysis) return;
+  const btn = document.getElementById('shadow-save-btn');
+  if (typeof window.savedAddItem === 'function') {
+    window.savedAddItem({
+      type:          'shadow',
+      summaryTitle:  shadowAnalysis.summaryTitle || 'Shadow Analysis',
+      summaryText:   shadowAnalysis.summaryText  || '',
+      awarenessScore:shadowAnalysis.awarenessScore,
+      patterns:      shadowAnalysis.patterns      || [],
+      reframes:      shadowAnalysis.reframes      || [],
+      strengths:     shadowAnalysis.hiddenStrengths || [],
+      growthActions: shadowAnalysis.growthActions  || [],
+    });
+    if (btn) { btn.textContent = '✅ Saved!'; btn.disabled = true; btn.style.opacity = '.6'; }
+  } else {
+    window.toast('Saved Items not available ⚠️');
+  }
+};
+
+/* ── Restore session on page load ─────────────────────────── */
+(function restoreShadowSession() {
+  let saved;
+  try { saved = JSON.parse(sessionStorage.getItem(SHADOW_KEY)); } catch (e) {}
+  if (!saved) return;
+
+  shadowAnalysis = saved;
+  renderShadowResults(saved);
+
+  document.getElementById('shadow-empty').style.display   = 'none';
+  document.getElementById('shadow-loading').style.display = 'none';
+  document.getElementById('shadow-results').style.display = 'block';
+
+  /* Teal session banner — inserted before the score card */
+  const resultsEl = document.getElementById('shadow-results');
+  if (resultsEl && !document.getElementById('shadow-session-banner')) {
+    const banner = document.createElement('div');
+    banner.id = 'shadow-session-banner';
+    banner.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:20px;background:rgba(45,212,191,.05);border:1px solid rgba(45,212,191,.18);border-radius:10px';
+    banner.innerHTML = `
+      <span style="font-size:.9rem">🔄</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--teal);flex:1">Results restored from your last session</span>
+      <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:2px 6px;opacity:.6"
+              onclick="sessionStorage.removeItem('${SHADOW_KEY}');this.closest('#shadow-session-banner').remove()">✕</button>`;
+    resultsEl.insertBefore(banner, resultsEl.firstChild);
+  }
+})();
+
+/* ── Render results ───────────────────────────────────────── */
 function renderShadowResults(data) {
   const colorMap   = { rose:'var(--rose)', amber:'var(--amber)', lavender:'var(--lavender)', teal:'var(--teal)', accent:'var(--accent)' };
   const bgMap      = { rose:'rgba(248,113,113,.1)', amber:'rgba(251,191,36,.1)', lavender:'rgba(167,139,250,.12)', teal:'rgba(45,212,191,.1)', accent:'rgba(79,142,247,.1)' };
@@ -254,18 +322,21 @@ function renderShadowResults(data) {
   }).join('');
 }
 
-// Named shadowEsc to avoid any conflict with the global esc()
+/* ── HTML escape helper ───────────────────────────────────── */
 function shadowEsc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/* ── Inject keyframe ──────────────────────────────────────── */
 if (!document.getElementById('shadow-spin-style')) {
   const s = document.createElement('style');
   s.id = 'shadow-spin-style';
   s.textContent = '@keyframes shadow-spin { to { transform: rotate(360deg) } }';
   document.head.appendChild(s);
 }
+
+})();
 </script>
 @endpush

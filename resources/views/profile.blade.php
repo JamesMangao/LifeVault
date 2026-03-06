@@ -1,8 +1,3 @@
-{{--
-╔══════════════════════════════════════════════════════════════════╗
-║  LIFEVAULT — profile.blade.php  (COMPLETE + FIXED)              ║
-╚══════════════════════════════════════════════════════════════════╝
---}}
 <style>
 :root{--bg:#0b0f1a;--surface:#111827;--surface2:#1a2235;--border:rgba(255,255,255,.07);--text:#e8eaf0;--muted:#6b7a99;--accent:#4f8ef7;--green:#34d399;--amber:#fbbf24;--rose:#f87171;--lavender:#a78bfa;--teal:#2dd4bf;--glow:0 0 40px rgba(79,142,247,.15);--sidebar-width:260px}
 @keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}

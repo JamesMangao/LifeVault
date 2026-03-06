@@ -1,3 +1,4 @@
+{{-- resources/views/analyzer.blade.php --}}
 <div id="page-analyzer" class="page">
 
   {{-- ══ PAGE HEADER ════════════════════════════════════════════ --}}
@@ -8,15 +9,20 @@
       </div>
       <div class="page-subtitle">Upload your resume and a job description to get an AI-powered analysis and match score</div>
     </div>
+    {{-- Analyze button in header, matching shadow/life-story pattern --}}
+    <button class="btn" id="analyzeTopBtn" onclick="document.getElementById('analysisForm').requestSubmit()" disabled
+            style="background:linear-gradient(135deg,rgba(79,142,247,.15),rgba(45,212,191,.15));border-color:rgba(79,142,247,.35);color:var(--accent);font-weight:700">
+      🔍 Analyze Resume
+    </button>
   </div>
 
   {{-- ══ AI ANALYSIS BANNER ════════════════════════════════════════ --}}
-  <div style="background:linear-gradient(135deg,rgba(34,197,94,.07),rgba(59,130,246,.07));border:1px solid rgba(34,197,94,.2);border-radius:16px;padding:18px 22px;margin-bottom:28px;display:flex;align-items:flex-start;gap:14px">
-    <span style="font-size:1.4rem;flex-shrink:0;margin-top:2px">🤖</span>
+  <div style="background:linear-gradient(135deg,rgba(79,142,247,.07),rgba(45,212,191,.07));border:1px solid rgba(79,142,247,.2);border-radius:16px;padding:18px 22px;margin-bottom:28px;display:flex;align-items:flex-start;gap:14px">
+    <span style="font-size:1.4rem;flex-shrink:0;margin-top:2px">🎯</span>
     <div>
-      <div style="font-size:.82rem;font-weight:700;margin-bottom:4px;color:var(--text)">Powered by Cerebras AI</div>
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:4px;color:var(--text)">Your AI Career Co-pilot</div>
       <div style="font-family:'Newsreader',serif;font-size:.85rem;color:var(--muted);line-height:1.65;font-weight:300">
-        Uses AI (llama3.1-8b) to deliver instant, accurate Match Score, Keyword Gaps, ATS Tips, and Quick Wins based on your resume and job description.
+        The Resume Analyzer gives you an edge in your job search. It provides an instant Match Score, identifies Keyword Gaps, offers ATS-friendly tips, and suggests Quick Wins to make your resume stand out to recruiters.
       </div>
     </div>
   </div>
@@ -25,7 +31,7 @@
     @csrf
     <input type="hidden" id="resumeMarkdown">
 
-    <div style="display:grid;grid-template-columns:420px 1fr;align-items:start;gap:20px;min-width:0">
+    <div style="display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:20px;min-width:0">
 
       {{-- ══════════════════════════════════════
            LEFT — Inputs + Preview
@@ -87,19 +93,7 @@
                     placeholder="Paste the full job description here — the more detail, the better the analysis…"></textarea>
         </div>
 
-        {{-- Analyze button --}}
-        <button type="submit" id="submitButton" class="ra-analyze-btn" disabled>
-          <span id="btnLabel" style="display:flex;align-items:center;justify-content:center;gap:9px">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Analyze Resume
-          </span>
-          <span id="btnLoading" style="display:none;align-items:center;justify-content:center;gap:10px">
-            <span class="ra-spin-sm"></span>
-            Analyzing…
-          </span>
-        </button>
-
-        {{-- ── RESUME PREVIEW (left column, below button) ──────────────── --}}
+        {{-- Resume Preview --}}
         <div id="ra-preview" class="ra-card" style="display:none">
           <div class="ra-preview-header" onclick="raTogglePreview()">
             <div style="display:flex;align-items:center;gap:10px">
@@ -165,7 +159,7 @@
           <div class="ra-loading-dots"><span></span><span></span><span></span></div>
         </div>
 
-        {{-- ── MATCH SCORE HERO ────────────────────────────────────────── --}}
+        {{-- Match Score Hero --}}
         <div id="ra-score" class="ra-score-hero" style="display:none">
           <div class="ra-score-left">
             <div class="ra-score-eyebrow">MATCH SCORE</div>
@@ -197,7 +191,7 @@
           </div>
         </div>
 
-        {{-- ── AI REPORT ───────────────────────────────────────────────── --}}
+        {{-- AI Report --}}
         <div id="ra-report" class="ra-card" style="display:none">
           <div class="ra-report-header">
             <div class="ra-report-title">
@@ -209,14 +203,15 @@
           <div id="ra-sections" class="ra-sections-list"></div>
         </div>
 
-        {{-- ── ACTION BUTTONS ──────────────────────────────────────────── --}}
+        {{-- Action Buttons --}}
         <div id="ra-actions" style="display:none;flex-direction:column;gap:10px">
-          <button type="button" id="saveAnalysisBtn" onclick="saveResumeAnalysisToFirestore()" class="ra-btn-save">
+          {{-- Save to Saved Items (matches shadow/story style) --}}
+          <button type="button" id="saveAnalysisBtn" onclick="saveResumeToSaved()" class="ra-btn-save">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
             </svg>
-            Save Analysis to Saved Items
+            🔖 Save Analysis to Saved Items
           </button>
           <button type="button" id="downloadDocx" data-url="{{ route('resume.download.docx') }}" class="ra-btn-download">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -232,36 +227,17 @@
   </form>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════
-     STYLES
-══════════════════════════════════════════════════════════ --}}
+{{-- Styles (unchanged from original) --}}
 <style>
 @keyframes ra-spin   { to { transform:rotate(360deg) } }
 @keyframes ra-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 @keyframes ra-pulse  { 0%,100%{opacity:.3} 50%{opacity:1} }
 @keyframes ra-dot1   { 0%,80%,100%{transform:scale(0);opacity:0} 40%{transform:scale(1);opacity:1} }
 
-/* ── Banner ──────────────────────────────────────────────── */
-.ra-banner {
-  display:flex; align-items:center; gap:10px;
-  padding:10px 16px; margin-bottom:24px;
-  background:rgba(45,212,191,.04);
-  border:1px solid rgba(45,212,191,.12);
-  border-radius:10px; overflow:hidden; position:relative;
-}
-.ra-banner::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg,var(--teal),var(--accent)); }
-.ra-banner-dot    { width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal); animation:ra-pulse 2s infinite; flex-shrink:0; margin-left:4px; }
-.ra-banner-label  { font-family:'JetBrains Mono',monospace; font-size:.52rem; font-weight:700; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; }
-.ra-banner-brand  { font-size:.78rem; font-weight:800; color:var(--teal); letter-spacing:-.01em; }
-.ra-banner-model  { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); opacity:.7; }
-.ra-banner-tag    { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); opacity:.5; letter-spacing:.04em; text-transform:uppercase; }
-
-/* ── Card base ───────────────────────────────────────────── */
 .ra-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; animation:ra-fadeUp .3s cubic-bezier(.4,0,.2,1) both; }
 .ra-card-label { display:flex; align-items:center; gap:8px; font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:14px; }
 .ra-card-num   { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--accent); background:rgba(79,142,247,.1); border:1px solid rgba(79,142,247,.2); padding:2px 7px; border-radius:5px; }
 
-/* ── Drop zone ───────────────────────────────────────────── */
 .ra-dropzone { border:1.5px dashed var(--border); border-radius:12px; background:rgba(255,255,255,.02); padding:28px 20px; text-align:center; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
 .ra-dropzone:hover, .ra-dropzone.drag-over { border-color:var(--accent); background:rgba(79,142,247,.04); }
 .ra-dropzone::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(79,142,247,.03),transparent); pointer-events:none; }
@@ -270,7 +246,6 @@
 .ra-dz-title { font-size:.82rem; font-weight:700; color:var(--text); margin-bottom:5px; }
 .ra-dz-sub   { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); opacity:.6; text-transform:uppercase; letter-spacing:.08em; }
 
-/* ── File chosen pill ────────────────────────────────────── */
 .ra-file-chosen { display:flex; align-items:center; gap:12px; margin-top:12px; padding:11px 14px; background:rgba(79,142,247,.06); border:1px solid rgba(79,142,247,.18); border-radius:10px; animation:ra-fadeUp .2s ease; }
 .ra-file-icon   { width:32px; height:32px; border-radius:8px; background:rgba(79,142,247,.1); border:1px solid rgba(79,142,247,.2); display:flex; align-items:center; justify-content:center; color:var(--accent); flex-shrink:0; }
 .ra-file-name   { font-size:.79rem; font-weight:700; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -278,20 +253,17 @@
 .ra-file-remove { background:transparent; border:1px solid var(--border); color:var(--muted); cursor:pointer; width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; transition:all .18s; flex-shrink:0; }
 .ra-file-remove:hover { border-color:var(--rose); color:var(--rose); background:rgba(248,113,113,.08); }
 
-/* ── Textarea ────────────────────────────────────────────── */
 .ra-textarea { width:100%; background:rgba(255,255,255,.02); color:var(--text); border:1.5px solid var(--border); border-radius:10px; padding:13px 14px; font-family:'Newsreader',serif; font-size:.9rem; font-weight:300; line-height:1.75; outline:none; resize:vertical; transition:border-color .2s, box-shadow .2s, background .2s; box-sizing:border-box; }
 .ra-textarea::placeholder { color:var(--muted); opacity:.5; }
 .ra-textarea:focus { border-color:rgba(79,142,247,.5); background:rgba(79,142,247,.02); box-shadow:0 0 0 3px rgba(79,142,247,.08); }
 .ra-jd-count { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); margin-left:auto; font-weight:400; }
 
-/* ── Analyze button ──────────────────────────────────────── */
 .ra-analyze-btn { width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),#3b6fd4); border:none; border-radius:12px; color:white; font-family:'Syne',sans-serif; font-size:.88rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
 .ra-analyze-btn::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.08),transparent); pointer-events:none; }
 .ra-analyze-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 24px rgba(79,142,247,.35); }
 .ra-analyze-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
 .ra-spin-sm { width:16px; height:16px; flex-shrink:0; border:2px solid rgba(255,255,255,.25); border-top-color:white; border-radius:50%; animation:ra-spin 1s linear infinite; display:inline-block; }
 
-/* ── Empty / loading states ──────────────────────────────── */
 .ra-empty-state   { text-align:center; padding:48px 24px; border-style:dashed; }
 .ra-empty-icon    { width:68px; height:68px; border-radius:18px; background:rgba(255,255,255,.03); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); opacity:.4; margin:0 auto 18px; }
 .ra-empty-title   { font-size:.92rem; font-weight:800; color:var(--muted); margin-bottom:7px; }
@@ -310,7 +282,6 @@
 .ra-loading-dots span:nth-child(2) { animation:ra-dot1 1.2s .16s infinite; }
 .ra-loading-dots span:nth-child(3) { animation:ra-dot1 1.2s .32s infinite; }
 
-/* ── Score hero ──────────────────────────────────────────── */
 .ra-score-hero { background:linear-gradient(135deg,rgba(79,142,247,.08),rgba(45,212,191,.05)); border:1px solid rgba(79,142,247,.18); border-radius:16px; padding:24px; display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto; gap:0; position:relative; overflow:hidden; animation:ra-fadeUp .3s ease both; }
 .ra-score-hero::before { content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px; border-radius:50%; background:radial-gradient(circle,rgba(45,212,191,.06),transparent 70%); pointer-events:none; }
 .ra-score-left     { grid-column:1; grid-row:1; }
@@ -327,14 +298,12 @@
 .ra-score-bar-track { height:5px; background:rgba(255,255,255,.07); border-radius:99px; overflow:hidden; }
 .ra-score-bar-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--teal),var(--accent)); width:0%; transition:width 1.4s cubic-bezier(.4,0,.2,1); }
 
-/* ── Report card ─────────────────────────────────────────── */
 .ra-report-header  { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); }
 .ra-report-title   { display:flex; align-items:center; gap:10px; font-size:.82rem; font-weight:800; color:var(--text); }
 .ra-report-dot     { width:8px; height:8px; border-radius:50%; background:var(--teal); box-shadow:0 0 8px rgba(45,212,191,.5); animation:ra-pulse 2.5s infinite; }
 .ra-report-badge   { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); background:rgba(255,255,255,.04); border:1px solid var(--border); padding:3px 9px; border-radius:6px; letter-spacing:.04em; }
 .ra-sections-list  { display:flex; flex-direction:column; gap:8px; }
 
-/* ── Accordion sections ──────────────────────────────────── */
 .ras-card  { border-radius:12px; overflow:hidden; border:1px solid var(--border); background:rgba(255,255,255,.025); transition:border-color .2s; animation:ra-fadeUp .28s cubic-bezier(.4,0,.2,1) both; }
 .ras-card:hover { border-color:rgba(255,255,255,.1); }
 .ras-header { display:flex; align-items:center; gap:10px; padding:11px 14px; cursor:pointer; user-select:none; transition:background .15s; }
@@ -357,7 +326,6 @@
 .ra-qw:last-child { border-bottom:none; padding-bottom:0; }
 .ra-qw-n    { width:24px; height:24px; min-width:24px; border-radius:6px; background:linear-gradient(135deg,var(--teal),var(--accent)); display:flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:900; color:white; font-family:'JetBrains Mono',monospace; }
 
-/* ── Preview card ────────────────────────────────────────── */
 .ra-preview-header  { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
 .ra-preview-title   { font-size:.77rem; font-weight:700; color:var(--text); }
 .ra-preview-filename{ font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); margin-left:4px; }
@@ -368,72 +336,36 @@
 .ra-preview-content::-webkit-scrollbar-track  { background:transparent; }
 .ra-preview-content::-webkit-scrollbar-thumb  { background:rgba(255,255,255,.1); border-radius:99px; }
 
-/* ══════════════════════════════════════════════════════════
-   RESUME DOCUMENT TYPOGRAPHY
-   Used by both Tier-1 (XML layout) and Tier-2/3 (linear)
-══════════════════════════════════════════════════════════ */
 .rp-doc        { font-family:'Newsreader',serif; font-size:.84rem; line-height:1.7; color:rgba(232,234,240,.78); }
-
-/* Name / headline */
 .rp-name       { font-family:'Syne',sans-serif; font-size:1.2rem; font-weight:800; color:rgba(232,234,240,1); letter-spacing:-.02em; margin-bottom:3px; }
-
-/* ALL-CAPS section headings */
-.rp-heading    {
-  font-family:'Syne',sans-serif; font-size:.67rem; font-weight:800;
-  letter-spacing:.15em; text-transform:uppercase;
-  color:var(--accent);
-  margin:14px 0 5px;
-  padding-bottom:4px;
-  border-bottom:1px solid rgba(79,142,247,.2);
-}
-
-/* Sub-headings (company name, job title) */
+.rp-heading    { font-family:'Syne',sans-serif; font-size:.67rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:var(--accent); margin:14px 0 5px; padding-bottom:4px; border-bottom:1px solid rgba(79,142,247,.2); }
 .rp-subheading { font-family:'Syne',sans-serif; font-size:.8rem; font-weight:700; color:rgba(232,234,240,.9); margin:6px 0 2px; }
-
-/* Contact / meta info */
 .rp-contact    { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:rgba(232,234,240,.4); margin-bottom:8px; letter-spacing:.02em; }
 .rp-meta       { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:rgba(232,234,240,.45); margin-bottom:2px; letter-spacing:.02em; }
-
-/* Body lines */
 .rp-line       { color:rgba(232,234,240,.72); margin-bottom:2px; }
-
-/* Bullet rows */
 .rp-bullet     { display:flex; gap:7px; align-items:baseline; color:rgba(232,234,240,.72); margin-bottom:3px; padding-left:2px; }
 .rp-bull-dot   { color:var(--teal); flex-shrink:0; font-size:.65rem; line-height:1.7; }
-
-/* Utility */
 .rp-spacer     { height:5px; }
 .rp-rule       { height:1px; background:rgba(255,255,255,.07); margin:8px 0; }
 
-/* ── Two-column layout rows (Tier 1 only) ─────────────────── *
- * .rp-row  = a horizontal row detected as having 2 columns    *
- * .rp-col  = one column within that row                       *
- * The columns stack naturally on narrow screens.              */
-.rp-row  {
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-  margin-bottom:1px;
-}
-.rp-col  {
-  flex:1;
-  min-width:0;      /* prevent overflow */
-}
-/* Ensure nested headings inside columns don't add double top margin */
-.rp-col .rp-heading:first-child { margin-top:6px; }
-
-/* ── Action buttons ──────────────────────────────────────── */
 .ra-btn-save { width:100%; padding:13px 18px; border-radius:12px; border:1.5px solid rgba(167,139,250,.3); background:rgba(167,139,250,.06); color:var(--lavender); font-family:'Syne',sans-serif; font-size:.8rem; font-weight:700; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; letter-spacing:.02em; }
-.ra-btn-save:hover { background:rgba(167,139,250,.14); border-color:rgba(167,139,250,.5); transform:translateY(-1px); }
+.ra-btn-save:hover:not(:disabled) { background:rgba(167,139,250,.14); border-color:rgba(167,139,250,.5); transform:translateY(-1px); }
+.ra-btn-save:disabled { opacity:.5; cursor:not-allowed; transform:none; }
 .ra-btn-download { width:100%; padding:13px 18px; border-radius:12px; border:1.5px solid rgba(52,211,153,.25); background:rgba(52,211,153,.05); color:var(--green); font-family:'Syne',sans-serif; font-size:.8rem; font-weight:700; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; letter-spacing:.02em; }
 .ra-btn-download:hover { background:rgba(52,211,153,.12); border-color:rgba(52,211,153,.45); transform:translateY(-1px); }
+
+.ra-session-banner { display:flex; align-items:center; gap:10px; padding:10px 14px; margin-top:12px; background:rgba(45,212,191,.05); border:1px solid rgba(45,212,191,.18); border-radius:10px; animation:ra-fadeUp .25s ease; }
+.ra-session-banner-text { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:var(--teal); flex:1; }
+.ra-session-banner-close { background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:.75rem; padding:2px 6px; opacity:.6; }
+.ra-session-banner-close:hover { opacity:1; }
 </style>
 
 <script>
 (function(){
 'use strict';
 
-/* ── refs ─────────────────────────────────────────────────── */
+const STORAGE_KEY = 'ra_last_analysis';
+
 const form      = document.getElementById('analysisForm');
 const fileInput = document.getElementById('resumeFile');
 const jobInput  = document.getElementById('jobDescription');
@@ -444,14 +376,12 @@ const jdCount   = document.getElementById('jdCount');
 let fileValid = false;
 window._latestResumeAnalysis = null;
 
-/* ── validation ───────────────────────────────────────────── */
 function revalidate(){
   const ok = fileValid && jobInput.value.trim().length > 0;
   submitBtn.disabled = !ok;
   if(topBtn) topBtn.disabled = !ok;
 }
 
-/* ── file handling ────────────────────────────────────────── */
 fileInput.addEventListener('change', () => attachFile(fileInput.files[0]));
 
 window.raHandleDrop = function(e){
@@ -503,16 +433,21 @@ function showDuplicateWarning(filename){
   const msg = document.getElementById('dup-warning-msg');
   if(msg) msg.textContent = `"${filename}" was already analysed. Re-running will give similar results unless you change the job description.`;
 }
+
 function hideDuplicateWarning(){
   const el = document.getElementById('dup-warning');
   if(el) el.style.display = 'none';
 }
+window.hideDuplicateWarning = hideDuplicateWarning;
 
 window.raClearFile = function(){
   fileInput.value = ''; fileValid = false;
   document.getElementById('dropZone').style.display   = 'block';
   document.getElementById('fileChosen').style.display = 'none';
   hideDuplicateWarning();
+  sessionStorage.removeItem(STORAGE_KEY);
+  hideRightPanels();
+  showPanel('ra-empty');
   revalidate();
 };
 
@@ -523,7 +458,6 @@ jobInput.addEventListener('input', () => {
   revalidate();
 });
 
-/* ── panel helpers ────────────────────────────────────────── */
 const RIGHT_PANELS = ['ra-empty','ra-loading','ra-score','ra-report','ra-actions'];
 function hideRightPanels(){ RIGHT_PANELS.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function showPanel(id){
@@ -531,7 +465,6 @@ function showPanel(id){
   el.style.display = id === 'ra-actions' ? 'flex' : 'block';
 }
 
-/* ── preview toggle ───────────────────────────────────────── */
 window.raTogglePreview = function(){
   const b = document.getElementById('previewBody');
   const c = document.getElementById('previewChevron');
@@ -543,7 +476,6 @@ window.raTogglePreview = function(){
   if(c) c.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
 };
 
-/* ── loading steps ────────────────────────────────────────── */
 function startSteps(){
   const msgs = ['Reading file…','Extracting layout…','Reconstructing columns…','Running AI…','Building report…'];
   let i = 0;
@@ -551,7 +483,6 @@ function startSteps(){
   return setInterval(() => { if(el) el.textContent = msgs[i++ % msgs.length]; }, 1500);
 }
 
-/* ── score animation ──────────────────────────────────────── */
 function animateScore(score){
   if(score == null) return;
   const numEl  = document.getElementById('scoreNum');
@@ -580,7 +511,6 @@ function animateScore(score){
     : 'linear-gradient(90deg,#f87171,#e879a0)';
 }
 
-/* ── markdown → html ──────────────────────────────────────── */
 function mdToHtml(md){
   if(!md) return '';
   let s = md
@@ -680,7 +610,95 @@ function renderReport(markdown){
   });
 }
 
-/* ── SUBMIT ───────────────────────────────────────────────── */
+/* ── Save to Saved Items (replaces Firestore save) ──────── */
+window.saveResumeToSaved = function(){
+  const a = window._latestResumeAnalysis;
+  if(!a){ toast('No analysis to save yet ⚠️'); return; }
+  const btn = document.getElementById('saveAnalysisBtn');
+  if(typeof window.savedAddItem === 'function'){
+    window.savedAddItem({
+      type:     'resume',
+      title:    a.fileName || 'Resume Analysis',
+      subtitle: (a.jobDescription || '').substring(0, 60) + (a.jobDescription?.length > 60 ? '…' : ''),
+      score:    a.matchScore,
+      markdown: a.suggestionsMarkdown || '',
+    });
+    if(btn){ btn.textContent = '✅ Saved!'; btn.disabled = true; }
+    setTimeout(() => {
+      if(btn){ btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 🔖 Save Analysis to Saved Items'; btn.disabled = false; }
+    }, 2500);
+  } else {
+    toast('Saved Items not available ⚠️');
+  }
+};
+
+/* ── Session persistence ────────────────────────────────── */
+function saveStateToSession(data, fileName, jobDesc){
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      score:    data.resume.match_score,
+      markdown: data.resume.suggestions_markdown,
+      content:  data.resume.resume_content,
+      fileName: fileName,
+      jobDesc:  jobDesc,
+    }));
+  } catch(e) {}
+}
+
+function restoreStateFromSession(){
+  let saved;
+  try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch(e) {}
+  if(!saved) return;
+
+  if(saved.jobDesc){
+    jobInput.value = saved.jobDesc;
+    jdCount.textContent = saved.jobDesc.length.toLocaleString() + ' chars';
+  }
+
+  hideRightPanels();
+  showPanel('ra-score');  animateScore(saved.score);
+  showPanel('ra-report'); renderReport(saved.markdown);
+  showPanel('ra-actions');
+
+  const pc = document.getElementById('previewContent');
+  if(pc) pc.innerHTML = saved.content ?? '';
+  document.getElementById('previewFilename').textContent = saved.fileName ?? '';
+  showPanel('ra-preview');
+
+  document.getElementById('resumeMarkdown').value = saved.markdown ?? '';
+
+  window._latestResumeAnalysis = {
+    fileName:            saved.fileName,
+    jobDescription:      (saved.jobDesc ?? '').substring(0, 500),
+    suggestionsMarkdown: saved.markdown,
+    matchScore:          saved.score,
+    createdAt:           new Date(),
+  };
+
+  fileValid = true;
+  document.getElementById('dropZone').style.display   = 'none';
+  document.getElementById('fileChosen').style.display = 'flex';
+  document.getElementById('chosenName').textContent   = saved.fileName ?? 'Resume';
+  document.getElementById('chosenSize').textContent   = 'Session restored — re-upload to re-analyze';
+  revalidate();
+
+  const card = document.getElementById('fileChosen')?.closest('.ra-card');
+  if(card && !document.getElementById('ra-session-banner')){
+    const banner = document.createElement('div');
+    banner.id = 'ra-session-banner';
+    banner.className = 'ra-session-banner';
+    banner.innerHTML = `
+      <span style="font-size:.9rem">🔄</span>
+      <span class="ra-session-banner-text">Results restored from your last session</span>
+      <button class="ra-session-banner-close" onclick="
+        sessionStorage.removeItem('${STORAGE_KEY}');
+        document.getElementById('ra-session-banner').remove();
+      ">✕</button>`;
+    card.appendChild(banner);
+  }
+}
+
+/* ── SUBMIT ─────────────────────────────────────────────── */
 form.addEventListener('submit', function(e){
   e.preventDefault();
   if(!fileValid){ toast('Please upload a valid resume file ⚠️'); return; }
@@ -691,7 +709,7 @@ form.addEventListener('submit', function(e){
   document.getElementById('btnLoading').style.display = 'flex';
 
   const sb = document.getElementById('saveAnalysisBtn');
-  if(sb){ sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Analysis to Saved Items'; sb.disabled = false; }
+  if(sb){ sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 🔖 Save Analysis to Saved Items'; sb.disabled = false; }
 
   hideRightPanels();
   showPanel('ra-loading');
@@ -716,7 +734,6 @@ form.addEventListener('submit', function(e){
     showPanel('ra-report'); renderReport(markdown);
     showPanel('ra-actions');
 
-    // Preview — controller returns .rp-doc HTML, render directly
     const pc = document.getElementById('previewContent');
     pc.innerHTML = data.resume.resume_content ?? '(No resume content returned)';
     showPanel('ra-preview');
@@ -732,6 +749,8 @@ form.addEventListener('submit', function(e){
     };
     _lastAnalysedFile = fileInput.files[0] ? fileFingerprint(fileInput.files[0]) : null;
     hideDuplicateWarning();
+
+    saveStateToSession(data, fileInput.files[0]?.name ?? 'Resume', jobInput.value.trim());
     toast('Analysis complete! ✅');
   })
   .catch(err => {
@@ -752,36 +771,7 @@ form.addEventListener('submit', function(e){
   });
 });
 
-/* ── Save to Firestore ────────────────────────────────────── */
-window.saveResumeAnalysisToFirestore = async function(){
-  const a = window._latestResumeAnalysis;
-  if(!a){ toast('No analysis to save yet ⚠️'); return; }
-  const cu = window.currentUser;
-  if(!cu){ toast('Please log in to save ⚠️'); return; }
-  const btn = document.getElementById('saveAnalysisBtn');
-  if(btn){ btn.disabled = true; btn.innerHTML = '💾 Saving…'; }
-  try {
-    const { addDoc, collection, serverTimestamp } = window._fbFS;
-    await addDoc(collection(window.db,'users',cu.uid,'resume_analyses'), { ...a, savedAt: serverTimestamp() });
-    if(btn){
-      btn.innerHTML = '✅ Saved!';
-      btn.style.background = 'rgba(167,139,250,.14)';
-      btn.style.borderColor = 'rgba(167,139,250,.45)';
-      setTimeout(() => {
-        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Analysis to Saved Items';
-        btn.style.background = 'rgba(167,139,250,.06)';
-        btn.style.borderColor = 'rgba(167,139,250,.3)';
-        btn.disabled = false;
-      }, 2500);
-    }
-    toast('Saved to 🔖 Saved Items! ✅');
-  } catch(err) {
-    if(btn){ btn.disabled = false; btn.innerHTML = 'Save Analysis to Saved Items'; }
-    toast('Error: ' + err.message + ' ❌');
-  }
-};
-
-/* ── Download DOCX ────────────────────────────────────────── */
+/* ── Download DOCX ──────────────────────────────────────── */
 document.addEventListener('click', function(e){
   const btn = e.target.closest('#downloadDocx');
   if(!btn) return;
@@ -794,230 +784,7 @@ document.addEventListener('click', function(e){
   document.body.appendChild(f); f.submit(); document.body.removeChild(f);
 });
 
+restoreStateFromSession();
+
 })();
-</script>
-<div id="page-analyzer" class="page">
-    <h1 class="page-title">AI Resume Analyzer</h1>
-    <p class="page-subtitle">Upload your resume and a job description to get an AI-powered analysis and match score.</p>
-
-    <div class="content-box">
-        <form id="analysisForm" enctype="multipart/form-data">
-            @csrf
-            <input type="hidden" id="resumeMarkdown">
-            
-            <div class="analyzer-form-grid">
-                <!-- Column 1: Uploads -->
-                <div class="form-column">
-                    <div class="form-group">
-                        <label for="resumeFile">1. Upload Your Resume</label>
-                        <label for="resumeFile" class="btn file-upload-btn">
-                            <span id="resumeFileName">Choose File...</span>
-                        </label>
-                        <input type="file" id="resumeFile" name="resume_file" accept=".pdf,.doc,.docx" required style="display:none;">
-                        <p class="form-help">Accepted formats: PDF, DOC, DOCX.</p>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="jobDescription">2. Paste Job Description</label>
-                        <textarea id="jobDescription" name="job_description" rows="12" required placeholder="Paste the full job description here..."></textarea>
-                    </div>
-                     <button type="submit" id="submitButton" class="btn btn-primary w-full" disabled>
-                        <span id="buttonText">Analyze Resume</span>
-                        <div id="loadingSpinner" class="spinner" style="display:none;"></div>
-                    </button>
-                </div>
-
-                <!-- Column 2: Preview & Suggestions -->
-                <div class="form-column">
-                    <div class="form-group">
-                        <label>Resume Preview</label>
-                        <div class="resume-preview-wrapper" id="resumeContentWrapper">
-                            <div id="resumeLoader" class="resume-loader">
-                                <div class="spinner"></div>
-                            </div>
-                            <div id="resumeContent" class="resume-content-placeholder">
-                                @if(session('resume'))
-                                    {!! session('resume')->resume_content !!}
-                                @else
-                                    <div class="empty-state mini">
-                                        <div class="empty-icon">📄</div>
-                                        <div class="empty-text">Your resume preview will appear here.</div>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    <div id="resumeSuggestions" class="form-group" style="display:none;">
-                         <label>AI Suggestions</label>
-                         <div id="suggestions-content" class="suggestions-box"></div>
-                         <button type="button" id="downloadDocx" class="btn btn-secondary w-full mt-2" data-url="{{ route('resume.download.docx') }}">
-                            Download Updated Resume (DOCX)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<style>
-/* ── FIX: Job Description textarea — force dark background ── */
-#jobDescription {
-    background: var(--surface2) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-family: 'Newsreader', serif;
-    font-size: .95rem;
-    font-weight: 300;
-    line-height: 1.65;
-    outline: none;
-    resize: vertical;
-    width: 100%;
-    transition: border-color .2s, box-shadow .2s;
-}
-#jobDescription::placeholder {
-    color: var(--muted);
-    opacity: .7;
-}
-#jobDescription:focus {
-    border-color: rgba(79, 142, 247, .5);
-    box-shadow: 0 0 0 3px rgba(79, 142, 247, .1);
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('analysisForm');
-    const resumeInput = document.getElementById('resumeFile');
-    const resumeFileName = document.getElementById('resumeFileName');
-    const jobDescriptionInput = document.getElementById('jobDescription');
-    const submitButton = document.getElementById('submitButton');
-    const buttonText = document.getElementById('buttonText');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const resumeContentDiv = document.getElementById('resumeContent');
-    const suggestionsContainer = document.getElementById('resumeSuggestions');
-    const suggestionsContent = document.getElementById('suggestions-content');
-
-    let resumeFileValid = false;
-    const allowedExtensions = ['pdf', 'doc', 'docx', 'txt'];
-
-    function validateForm() {
-        const isJobDescFilled = jobDescriptionInput.value.trim() !== '';
-        submitButton.disabled = !resumeFileValid || !isJobDescFilled;
-    }
-
-    resumeInput.addEventListener('change', function () {
-        const file = resumeInput.files[0];
-        if (!file) {
-            resumeFileValid = false;
-            resumeFileName.textContent = 'Choose File...';
-        } else {
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (!allowedExtensions.includes(ext)) {
-                toast('Invalid file type. Please use PDF, DOC, or DOCX.', '❌');
-                resumeInput.value = '';
-                resumeFileValid = false;
-                resumeFileName.textContent = 'Choose File...';
-            } else {
-                resumeFileValid = true;
-                resumeFileName.textContent = file.name;
-            }
-        }
-        validateForm();
-    });
-
-    jobDescriptionInput.addEventListener('input', validateForm);
-
-    const loader = document.getElementById('resumeLoader');
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        if (!resumeFileValid) {
-            toast('Please upload a valid resume file.', '⚠️');
-            return;
-        }
-
-        submitButton.disabled = true;
-        buttonText.style.display = 'none';
-        loadingSpinner.style.display = 'block';
-        loader.style.display = 'flex';
-
-        const formData = new FormData(form);
-
-        fetch('{{ route("analyze.resume.ajax") }}', { 
-            method: 'POST', 
-            body: formData,
-            headers: { 'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value }
-        })
-        .then(async res => {
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({ message: 'An unknown error occurred.' }));
-                throw errorData;
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (!data.success) { throw data; }
-            
-            resumeContentDiv.innerHTML = data.resume.resume_content;
-            resumeContentDiv.classList.remove('resume-content-placeholder');
-
-            if (data.resume.suggestions_html) {
-                suggestionsContainer.style.display = 'block';
-                suggestionsContent.innerHTML = data.resume.suggestions_html;
-                document.getElementById('resumeMarkdown').value = data.resume.suggestions_markdown;
-            } else {
-                suggestionsContainer.style.display = 'none';
-            }
-            toast('Analysis complete!', '✅');
-        })
-        .catch(err => {
-            console.error('Analysis error:', err);
-            const errorMessage = err?.errors ? Object.values(err.errors)[0][0] : (err?.message || 'Analysis failed. Please try again.');
-            toast(errorMessage, '❌');
-        })
-        .finally(() => {
-            loader.style.display = 'none';
-            submitButton.disabled = false;
-            buttonText.style.display = 'inline';
-            loadingSpinner.style.display = 'none';
-        });
-    });
-
-    document.addEventListener('click', function(e) {
-        if (e.target && e.target.id === 'downloadDocx') {
-            const button = e.target;
-            const url = button.dataset.url;
-            const markdown = document.getElementById('resumeMarkdown').value;
-
-            if (!markdown) {
-                toast('No resume content to download.', '⚠️');
-                return;
-            }
-
-            const downloadForm = document.createElement('form');
-            downloadForm.method = 'POST';
-            downloadForm.action = url;
-            downloadForm.style.display = 'none';
-
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = document.querySelector('input[name="_token"]').value;
-
-            const contentInput = document.createElement('input');
-            contentInput.type = 'hidden';
-            contentInput.name = 'resume_markdown';
-            contentInput.value = markdown;
-
-            downloadForm.appendChild(csrfInput);
-            downloadForm.appendChild(contentInput);
-            document.body.appendChild(downloadForm);
-            downloadForm.submit();
-            document.body.removeChild(downloadForm);
-        }
-    });
-});
 </script>

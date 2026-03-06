@@ -147,6 +147,7 @@ class ResumeAnalysisController extends Controller
             $jobDescription = trim($request->job_description);
 
             // 5️⃣ Build AI prompt
+            // FIX 2: Stricter score instruction to ensure consistent format and regex extraction
             $prompt = <<<PROMPT
 You are an expert resume coach and ATS specialist. Analyze the resume below against the job description and provide a detailed structured report.
 
@@ -159,7 +160,8 @@ JOB DESCRIPTION:
 Respond ONLY in Markdown using exactly these section headings (##):
 
 ## Match Score
-Give a score as: **Score: XX/100** on its own line, followed by a one-sentence summary.
+You MUST output the score on its very first line in this EXACT format with no variation: **Score: XX/100**
+Replace XX with an integer 0-100. Do not write anything before this line. Follow with a one-sentence summary.
 
 ## Executive Summary
 2-3 sentences summarizing how well this resume fits the role.
@@ -201,13 +203,15 @@ PROMPT;
                         'Authorization' => 'Bearer ' . $apiKey,
                         'Content-Type'  => 'application/json',
                     ],
+                    // FIX 1: temperature set to 0 for deterministic, consistent output
                     'json' => [
-                        'model'      => 'llama3.1-8b',
-                        'max_tokens' => 2048,
-                        'messages'   => [
+                        'model'       => 'llama3.1-8b',
+                        'max_tokens'  => 2048,
+                        'temperature' => 0,
+                        'messages'    => [
                             [
                                 'role'    => 'system',
-                                'content' => 'You are an expert resume coach and ATS specialist. Always respond in well-structured Markdown.',
+                                'content' => 'You are an expert resume coach and ATS specialist. Always respond in well-structured Markdown. Always start the ## Match Score section with **Score: XX/100** on the very first line, where XX is an integer.',
                             ],
                             [
                                 'role'    => 'user',
@@ -330,10 +334,6 @@ PROMPT;
 
         try {
             // ── Step 1: PDF → PNG pages via pdftoppm ────────────────────
-            //
-            // pdftoppm -png -r 300 "input.pdf" "workdir/page"
-            // Produces: workdir/page-1.png, workdir/page-2.png, ...
-            //
             $cmd = '"' . $pdftoppmBin . '"'
                 . ' -png'
                 . ' -r 300'
@@ -363,10 +363,6 @@ PROMPT;
             \Log::info('pdftoppm produced ' . count($pageFiles) . ' page(s).');
 
             // ── Step 2: Tesseract OCR on each PNG ───────────────────────
-            //
-            // tesseract "page-1.png" "page-1_out" -l eng --oem 3 --psm 1
-            // Produces: page-1_out.txt
-            //
             foreach ($pageFiles as $pagePng) {
                 $outBase = $workDir . DIRECTORY_SEPARATOR
                     . pathinfo($pagePng, PATHINFO_FILENAME) . '_out';

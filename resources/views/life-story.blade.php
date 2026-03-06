@@ -8,7 +8,8 @@
       </div>
       <div class="page-subtitle">Turn your journal entries into a beautifully written narrative</div>
     </div>
-    <button class="btn btn-primary" id="generate-story-btn" onclick="generateLifeStory()">
+    <button class="btn" id="generate-story-btn" onclick="generateLifeStory()"
+            style="background:linear-gradient(135deg,rgba(79,142,247,.15),rgba(167,139,250,.15));border-color:rgba(79,142,247,.35);color:var(--accent);font-weight:700">
       ✨ Generate My Story
     </button>
   </div>
@@ -57,10 +58,14 @@
         <div class="card-title">🎭 Narrative Style</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           @foreach([
-            ['memoir',    '📝', 'Memoir',          'Reflective, intimate first-person prose'],
-            ['literary',  '📚', 'Literary Fiction', 'Vivid, character-driven storytelling'],
-            ['poetic',    '🌸', 'Poetic Prose',    'Lyrical, metaphor-rich language'],
-            ['cinematic', '🎬', 'Cinematic',        'Scene-by-scene, visual narrative'],
+            ['memoir',      '📝', 'Memoir',                    'Reflective, intimate first-person prose'],
+            ['literary',    '📚', 'Literary Fiction',          'Vivid, character-driven storytelling'],
+            ['poetic',      '🌸', 'Poetic Prose',              'Lyrical, metaphor-rich language'],
+            ['cinematic',   '🎬', 'Cinematic',                 'Scene-by-scene, visual narrative'],
+            ['epistolary',  '✉️',  'Epistolary',               'Written as letters to your future self'],
+            ['stream',      '🌊', 'Stream of Consciousness',  'Raw, unfiltered inner monologue'],
+            ['mythic',      '⚔️',  'Mythic Hero\'s Journey',  'Your story as an epic quest'],
+            ['detective',   '🔍', 'Self-Discovery',            'Uncovering clues about who you are'],
           ] as [$val, $icon, $label, $desc])
           <div class="story-style-option {{ $val === 'memoir' ? 'selected' : '' }}"
                data-style="{{ $val }}"
@@ -149,23 +154,13 @@
         <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap">
           <button class="btn btn-primary" onclick="generateLifeStory()" style="font-size:.78rem">🔄 Regenerate</button>
           <button class="btn" onclick="copyStory()" style="font-size:.78rem">📋 Copy</button>
+          <button class="btn" id="save-story-btn" onclick="saveStoryToSaved()"
+                  style="font-size:.78rem;border-color:rgba(167,139,250,.3);color:var(--lavender);background:rgba(167,139,250,.06)">
+            🔖 Save to Saved Items
+          </button>
           <button class="btn" onclick="saveStoryToJournal()" style="font-size:.78rem;border-color:rgba(52,211,153,.3);color:var(--green)">📓 Save to Journal</button>
           <button class="btn" onclick="shareStory()" style="font-size:.78rem;border-color:rgba(45,212,191,.3);color:var(--teal)">↗ Share</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  {{-- Saved Stories --}}
-  <div class="card">
-    <div class="card-title">
-      📚 Saved Stories
-      <span style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);font-weight:400;margin-left:auto">Generated narratives from your life</span>
-    </div>
-    <div id="saved-stories-list">
-      <div style="text-align:center;padding:32px;color:var(--muted)">
-        <div style="font-size:2rem;margin-bottom:10px;opacity:.4">📚</div>
-        <div style="font-family:'Newsreader',serif;font-style:italic;font-size:.82rem">No saved stories yet — generate your first one above</div>
       </div>
     </div>
   </div>
@@ -176,6 +171,9 @@
 <script>
 (function () {
   'use strict';
+
+  /* ── Session key ────────────────────────────────────────── */
+  const STORY_KEY = 'ls_last_story';
 
   // ── Inject styles once ───────────────────────────────────────
   if (!document.getElementById('ls-styles')) {
@@ -277,10 +275,14 @@
   // ── Build prompt ──────────────────────────────────────────────
   function buildPrompt(entries) {
     const styleMap = {
-      memoir:    'first-person memoir prose — reflective, warm, and intimate',
-      literary:  'literary fiction with vivid sensory detail and a strong character voice',
-      poetic:    'lyrical poetic prose rich with metaphors and emotional imagery',
-      cinematic: 'cinematic scene-by-scene storytelling — show-don\'t-tell, visual and immersive',
+      memoir:     'first-person memoir prose — reflective, warm, and intimate',
+      literary:   'literary fiction with vivid sensory detail and a strong character voice',
+      poetic:     'lyrical poetic prose rich with metaphors and emotional imagery',
+      cinematic:  'cinematic scene-by-scene storytelling — show-don\'t-tell, visual and immersive',
+      epistolary: 'heartfelt letters written directly to your future self — raw, honest, and personal',
+      stream:     'stream of consciousness — unfiltered inner monologue, associative, honest, vulnerable',
+      mythic:     'the mythic hero\'s journey — you are the protagonist of an epic quest, facing trials and transformation',
+      detective:  'self-discovery written like a detective narrative — uncovering clues, patterns, and revelations about who you are',
     };
 
     const summarised = entries.slice(0, 20).map(e =>
@@ -300,7 +302,7 @@ ${summarised}
 
 WRITING INSTRUCTIONS:
 - Write exactly 5 paragraphs of moving, genuine prose
-- Style: ${styleMap[selectedStyle]}
+- Style: ${styleMap[selectedStyle] || styleMap.memoir}
 - Use second person ("You…") to make it feel personal and immersive
 - Draw directly from the real emotions, events, and details in the journals
 - The very first line must be the chapter title in this EXACT format: TITLE: [your evocative title here]
@@ -324,6 +326,14 @@ Begin now with the TITLE: line, then the five paragraphs.`;
     showPanel('story-loading-state');
     document.getElementById('generate-story-btn').disabled = true;
     document.getElementById('story-word-count').textContent = '';
+
+    /* Remove any existing session banner when regenerating */
+    const oldBanner = document.getElementById('ls-session-banner');
+    if (oldBanner) oldBanner.remove();
+
+    /* Reset save button */
+    const saveBtn = document.getElementById('save-story-btn');
+    if (saveBtn) { saveBtn.textContent = '🔖 Save to Saved Items'; saveBtn.disabled = false; saveBtn.style.opacity = '1'; }
 
     const stepInterval = animateLoadingSteps();
 
@@ -370,6 +380,9 @@ Begin now with the TITLE: line, then the five paragraphs.`;
         createdAt: new Date(),
       };
 
+      /* ── Persist to sessionStorage ────────────────────────── */
+      try { sessionStorage.setItem(STORY_KEY, JSON.stringify(currentStory)); } catch (e) {}
+
       document.getElementById('story-chapter-title').textContent = `"${chapterTitle}"`;
       document.getElementById('story-text').textContent          = storyBody;
 
@@ -387,6 +400,69 @@ Begin now with the TITLE: line, then the five paragraphs.`;
       console.error('[LifeStory]', err);
     } finally {
       document.getElementById('generate-story-btn').disabled = false;
+    }
+  };
+
+  // ── Restore session on page load ──────────────────────────────
+  (function restoreStorySession() {
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(STORY_KEY)); } catch (e) {}
+    if (!saved) return;
+
+    currentStory = saved;
+
+    /* Restore selector UI state */
+    if (saved.range) selectRange(saved.range);
+    if (saved.style) selectStyle(saved.style);
+
+    /* Restore theme chip highlights */
+    if (Array.isArray(saved.themes)) {
+      saved.themes.forEach(theme => {
+        const chip = document.querySelector(`.theme-chip[data-theme="${theme}"]`);
+        if (chip) toggleTheme(theme, chip);
+      });
+    }
+
+    /* Restore story output */
+    document.getElementById('story-chapter-title').textContent = `"${saved.title}"`;
+    document.getElementById('story-text').textContent          = saved.body;
+
+    const wc = (saved.body || '').split(/\s+/).filter(Boolean).length;
+    document.getElementById('story-word-count').textContent = `${wc} words`;
+
+    showPanel('story-result');
+
+    /* Teal session banner */
+    const resultEl = document.getElementById('story-result');
+    if (resultEl && !document.getElementById('ls-session-banner')) {
+      const banner = document.createElement('div');
+      banner.id = 'ls-session-banner';
+      banner.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:16px;background:rgba(45,212,191,.05);border:1px solid rgba(45,212,191,.18);border-radius:10px;flex-shrink:0';
+      banner.innerHTML = `
+        <span style="font-size:.9rem">🔄</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--teal);flex:1">Story restored from your last session</span>
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:2px 6px;opacity:.6"
+                onclick="sessionStorage.removeItem('${STORY_KEY}');this.closest('#ls-session-banner').remove()">✕</button>`;
+      resultEl.insertBefore(banner, resultEl.firstChild);
+    }
+  })();
+
+  // ── Save to Saved Items ───────────────────────────────────────
+  window.saveStoryToSaved = () => {
+    if (!currentStory) return;
+    const btn = document.getElementById('save-story-btn');
+    if (typeof window.savedAddItem === 'function') {
+      window.savedAddItem({
+        type:     'story',
+        title:    currentStory.title,
+        body:     currentStory.body,
+        range:    currentStory.range,
+        style:    currentStory.style,
+        themes:   currentStory.themes || [],
+      });
+      if (btn) { btn.textContent = '✅ Saved!'; btn.disabled = true; btn.style.opacity = '.6'; }
+    } else {
+      notify('Saved Items not available ⚠️');
     }
   };
 

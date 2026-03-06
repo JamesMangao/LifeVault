@@ -27,3 +27,4 @@ mysql/data/
 *.log
 *.err
 token.txt
+firebase-adminsdk.json

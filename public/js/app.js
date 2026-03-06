@@ -30,7 +30,7 @@ let feedUnsubscribe = null;
 let composerType = 'thought';
 let userProfile = {};
 let selectedAvatarUrl = '';
-let selectedCoverData = null; // { type: 'preset'|'hex', value: string (gradient CSS) }
+let selectedCoverData = null;
 
 const MOTIVATIONS = ["Every small step counts 🚀","Progress, not perfection 🎯","You're stronger than you think 💪","Today is full of possibilities ✨","Be kind to yourself 💖","Your future self will thank you 🙏","You've got this! 🔥","Growth happens outside comfort zones 🌱"];
 const CAT_ICONS = {health:'💪',learn:'📚',finance:'💰',career:'💼',personal:'🌱',other:'⭐'};
@@ -83,20 +83,25 @@ window.closeSidebar = () => {
 window.addEventListener('load', () => {
   setTimeout(() => {
     document.getElementById('loading').classList.add('hidden');
-    onAuthStateChanged(auth, user => {
+    onAuthStateChanged(auth, async user => {
       if (user) {
+        // ── Grace-period deletion check ────────────────────────
+        // Run before showing the app so we can either restore the
+        // account (user came back in time) or finish deleting it.
+        const proceed = await _deletionGuard.checkOnLogin(user);
+        if (!proceed) return; // account was past 30 days → wiped, sign-out handled inside
+
         currentUser = user;
-        window.currentUser = user; // Expose for debugging
+        window.currentUser = user;
         showApp(user);
         loadAll();
       }
       else showAuth();
     });
-    // Fallback if auth never fires
     setTimeout(() => {
-      const auth = document.getElementById('auth-screen');
-      const app  = document.getElementById('app');
-      if (auth.style.display === 'none' && app.style.display === 'none') showAuth();
+      const authEl = document.getElementById('auth-screen');
+      const app    = document.getElementById('app');
+      if (authEl.style.display === 'none' && app.style.display === 'none') showAuth();
     }, 6000);
   }, 1200);
 });
@@ -105,6 +110,94 @@ function showAuth() {
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
+
+// Global theme system
+window.applyTheme = function(theme) {
+  const root = document.documentElement;
+  const themes = {
+    dark: {
+      bg: '#0b0f1a',
+      surface: '#111827',
+      surface2: '#1a2235',
+      border: 'rgba(255,255,255,0.07)',
+      text: '#e8eaf0',
+      muted: '#6b7a99',
+      accent: '#4f8ef7',
+      green: '#34d399',
+      amber: '#fbbf24',
+      rose: '#f87171',
+      lavender: '#a78bfa',
+      teal: '#2dd4bf',
+      glow: '0 0 40px rgba(79,142,247,0.15)'
+    },
+    midnight: {
+      bg: '#0f0c29',
+      surface: '#1a1640',
+      surface2: '#252050',
+      border: 'rgba(255,255,255,0.08)',
+      text: '#e8eaf0',
+      muted: '#7a6fa8',
+      accent: '#6366f1',
+      green: '#34d399',
+      amber: '#fbbf24',
+      rose: '#f87171',
+      lavender: '#a78bfa',
+      teal: '#2dd4bf',
+      glow: '0 0 40px rgba(99,102,241,0.15)'
+    },
+    forest: {
+      bg: '#071a0e',
+      surface: '#0d2e18',
+      surface2: '#1a3d26',
+      border: 'rgba(255,255,255,0.08)',
+      text: '#e8eaf0',
+      muted: '#6b8a6f',
+      accent: '#22c55e',
+      green: '#34d399',
+      amber: '#fbbf24',
+      rose: '#f87171',
+      lavender: '#a78bfa',
+      teal: '#2dd4bf',
+      glow: '0 0 40px rgba(34,197,94,0.15)'
+    },
+    rose: {
+      bg: '#1a0a0a',
+      surface: '#2d1212',
+      surface2: '#3d1a1a',
+      border: 'rgba(255,255,255,0.08)',
+      text: '#e8eaf0',
+      muted: '#8a6b6b',
+      accent: '#f87171',
+      green: '#34d399',
+      amber: '#fbbf24',
+      rose: '#f87171',
+      lavender: '#a78bfa',
+      teal: '#2dd4bf',
+      glow: '0 0 40px rgba(248,113,113,0.15)'
+    }
+  };
+
+  const selectedTheme = themes[theme] || themes.dark;
+  Object.keys(selectedTheme).forEach(key => {
+    root.style.setProperty(`--${key}`, selectedTheme[key]);
+  });
+};
+
+// Load user's saved theme preference
+async function loadUserTheme(userId) {
+  try {
+    const { getDoc, doc } = window._fbFS;
+    const snap = await getDoc(doc(window.db, 'settings', userId));
+    if (snap.exists()) {
+      const settings = snap.data();
+      const theme = settings.appearance?.theme || 'dark';
+      window.applyTheme(theme);
+    }
+  } catch (e) {
+    console.warn('Theme load error:', e.message);
+  }
+}
+
 function showApp(user) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -114,9 +207,14 @@ function showApp(user) {
   document.getElementById('user-avatar').src = av;
   document.getElementById('composer-avatar').src = av;
   updateGreeting();
-  ensureUserProfileExists(user); // Ensure a user profile document exists
+  // Show welcome-back banner if deletion was auto-cancelled on this login
+  _maybeShowWelcomeBackBanner();
+  // Show persistent deletion-pending banner if account is still in queue
+  _checkAndShowDeletionBanner(user.uid);
+  ensureUserProfileExists(user);
   loadUserProfile();
-  restoreLastPage(); // Restore last page on app load
+  loadUserTheme(user.uid); // Load and apply user's saved theme
+  restoreLastPage();
 }
 
 async function ensureUserProfileExists(user) {
@@ -125,8 +223,6 @@ async function ensureUserProfileExists(user) {
   try {
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) {
-      // User document doesn't exist, so create it
-      console.log(`[Debug] User profile for ${user.uid} not found. Creating one.`);
       await setDoc(userRef, {
         displayName: user.displayName || 'Anonymous',
         email: user.email,
@@ -136,9 +232,6 @@ async function ensureUserProfileExists(user) {
         isPublic: true,
         joinedAt: serverTimestamp()
       });
-      console.log(`[Debug] User profile created for ${user.uid}.`);
-    } else {
-      console.log(`[Debug] User profile for ${user.uid} already exists.`);
     }
   } catch (error) {
     console.error("Error ensuring user profile exists:", error);
@@ -170,14 +263,11 @@ async function loadAll() {
     tasks    = t.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     goals    = g.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
 
-    // Expose for debugging
     window.journals = journals;
     window.tasks = tasks;
     window.goals = goals;
 
-    // Subscribe to community feed so posts are available on all pages
     subscribeFeed();
-    
     renderAll();
   } catch(e) { toast('Load error: '+e.message,'❌'); }
 }
@@ -196,23 +286,500 @@ window.navigateTo = (page, event) => {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
-  localStorage.setItem('lifeVaultLastPage', page); // Save current page
+  localStorage.setItem('lifeVaultLastPage', page);
   closeSidebar();
   if (page === 'insights')   renderInsights();
   if (page === 'community')  { subscribeFeed(); document.getElementById('new-posts-dot').style.display='none'; }
   if (page === 'profile')    renderProfilePage();
-  if (page === 'settings')   window.renderSettingsPage();
+  if (page === 'settings')   _settingsModule.load();
   if (page === 'shadow-self' || page === 'life-story') initializeLearningResources();
 };
 
 function restoreLastPage() {
-    const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
-    navigateTo(lastPage);
+  const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
+  navigateTo(lastPage);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   SETTINGS MODULE  —  self-contained, no stubs
+══════════════════════════════════════════════════════════════ */
+const _settingsModule = (() => {
+  let _listenersAttached = false;
+  let _acceptingChanges  = false;
+
+  function _showBar() { document.getElementById('settings-save-bar')?.classList.add('visible'); }
+  function _hideBar() { document.getElementById('settings-save-bar')?.classList.remove('visible'); }
+
+  // Clone-replace trick: sets .checked with zero chance of firing a change event
+  function _setToggle(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const clone = el.cloneNode(true);
+    clone.checked = Boolean(value);
+    el.parentNode.replaceChild(clone, el);
+  }
+
+  function _attachListeners() {
+    // After _setToggle the originals are replaced — always re-query fresh nodes
+    _listenersAttached = false;
+    if (_listenersAttached) return;
+    _listenersAttached = true;
+    document.querySelectorAll('#page-settings .toggle-switch input').forEach(el => {
+      el.addEventListener('change', () => { if (_acceptingChanges) _showBar(); });
+    });
+  }
+
+  async function load() {
+    const user = auth?.currentUser;
+    if (!user) return;
+
+    _acceptingChanges = false; // block the gate while we populate
+
+    try {
+      const snap = await getDoc(doc(db, 'settings', user.uid));
+      if (snap.exists()) {
+        const s = snap.data();
+        if (s.notifications) {
+          _setToggle('notif-journal',   s.notifications.journal   ?? true);
+          _setToggle('notif-goals',     s.notifications.goals     ?? true);
+          _setToggle('notif-community', s.notifications.community ?? false);
+        }
+        if (s.privacy) {
+          _setToggle('privacy-public',    s.privacy.public    ?? true);
+          _setToggle('privacy-community', s.privacy.community ?? true);
+        }
+      }
+    } catch(e) {
+      console.warn('Settings load error:', e.message);
+    }
+
+    // Re-attach on the freshly cloned nodes, then open the gate after two
+    // animation frames so any browser-queued microtasks have fully flushed
+    _attachListeners();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      _acceptingChanges = true;
+      _hideBar();
+    }));
+  }
+
+  async function save() {
+    const user = auth?.currentUser;
+    if (!user) { toast('You must be logged in.', '⚠️'); return false; }
+
+    const data = {
+      notifications: {
+        journal:   document.getElementById('notif-journal')?.checked   ?? true,
+        goals:     document.getElementById('notif-goals')?.checked     ?? true,
+        community: document.getElementById('notif-community')?.checked ?? false,
+      },
+      privacy: {
+        public:    document.getElementById('privacy-public')?.checked    ?? true,
+        community: document.getElementById('privacy-community')?.checked ?? true,
+      }
+    };
+
+    // Also sync the privacy flags to the user's profile document so that
+    // community / profile pages respect the setting immediately
+    try {
+      await Promise.all([
+        setDoc(doc(db, 'settings', user.uid), data, { merge: true }),
+        updateDoc(doc(db, 'users', user.uid), {
+          isPublic: data.privacy.public,
+          showInCommunity: data.privacy.community,
+        })
+      ]);
+      // Update in-memory profile too so renderProfilePage() is instant
+      if (userProfile) {
+        userProfile.isPublic = data.privacy.public;
+        userProfile.showInCommunity = data.privacy.community;
+      }
+      toast('Settings saved!', '✅');
+      return true;
+    } catch(e) {
+      console.error('Save error:', e);
+      toast('Error saving settings.', '🔥');
+      return false;
+    }
+  }
+
+  return { load, save, hideBar: _hideBar };
+})();
+
+// Public handles called from HTML onclick attributes
+window.handleSave = async () => {
+  const ok = await _settingsModule.save();
+  if (ok) _settingsModule.hideBar();
+};
+
+// Called by navigateTo — this is the ONLY definition of renderSettingsPage
+window.renderSettingsPage = () => _settingsModule.load();
 
 /* ══════════════════════════════════════════════════════════════
-   JOURNAL EXPAND  —  FIX: use dataset + delegated listeners
+   EXPORT  —  full Firestore export (replaces old exportAsJSON stub)
+══════════════════════════════════════════════════════════════ */
+window.exportUserData = async () => {
+  const user = auth?.currentUser;
+  if (!user) { toast('Not logged in.', '⚠️'); return; }
+  toast('Gathering your data…', '📦');
+  try {
+    const uid = user.uid;
+    const [profileSnap, settingsSnap, jSnap, tSnap, gSnap] = await Promise.all([
+      getDoc(doc(db, 'users', uid)),
+      getDoc(doc(db, 'settings', uid)),
+      getDocs(collection(db, 'users', uid, 'journals')),
+      getDocs(collection(db, 'users', uid, 'tasks')),
+      getDocs(collection(db, 'users', uid, 'goals')),
+    ]);
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      user: { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL },
+      profile:  profileSnap.exists()  ? profileSnap.data()  : null,
+      settings: settingsSnap.exists() ? settingsSnap.data() : null,
+      collections: {
+        journals: jSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        tasks:    tSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        goals:    gSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      }
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `lifevault-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('Export complete!', '✅');
+  } catch(e) {
+    console.error(e);
+    toast('Export failed. See console.', '🔥');
+  }
+};
+
+// Legacy alias used by the backup button elsewhere in the app
+window.exportAsJSON = window.exportUserData;
+
+/* ══════════════════════════════════════════════════════════════
+   ACCOUNT DELETION  —  30-day grace period system
+   ─────────────────────────────────────────────────────────────
+   Flow:
+   1. User requests deletion => we write deletionScheduledAt to
+      Firestore and sign them out. Data stays untouched.
+   2. On every subsequent login => checkOnLogin() runs:
+      a. No deletion flag  => normal login, show app.
+      b. Flag exists, < 30 days => cancel flag (user came back),
+         show "Welcome back" banner, continue to app.
+      c. Flag exists, >= 30 days => wipe all data, delete Auth
+         account, show auth screen.
+   3. User can also cancel from the Settings page while still
+      logged in via cancelAccountDeletion().
+══════════════════════════════════════════════════════════════ */
+
+const DELETION_GRACE_DAYS = 30;
+
+const _deletionGuard = (() => {
+
+  // ── Internal: permanently wipe everything ─────────────────
+  async function _hardDelete(user) {
+    const uid = user.uid;
+    try {
+      const batch = writeBatch(db);
+      const [jSnap, tSnap, gSnap] = await Promise.all([
+        getDocs(collection(db, 'users', uid, 'journals')),
+        getDocs(collection(db, 'users', uid, 'tasks')),
+        getDocs(collection(db, 'users', uid, 'goals')),
+      ]);
+      jSnap.docs.forEach(d => batch.delete(d.ref));
+      tSnap.docs.forEach(d => batch.delete(d.ref));
+      gSnap.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, 'users', uid));
+      batch.delete(doc(db, 'settings', uid));
+      batch.delete(doc(db, 'deletion_queue', uid));
+      await batch.commit();
+      await user.delete();
+    } catch(e) {
+      console.error('Hard delete error:', e);
+      if (e.code === 'auth/requires-recent-login') {
+        // Can't delete auth account without recent sign-in.
+        // Data is already wiped from Firestore; just sign out.
+        await fbSignOut(auth);
+      }
+    }
+  }
+
+  // ── Called on every login ──────────────────────────────────
+  // Returns true  → allow app to load normally
+  // Returns false → account deleted or being signed out
+  async function checkOnLogin(user) {
+    try {
+      const snap = await getDoc(doc(db, 'deletion_queue', user.uid));
+      if (!snap.exists()) return true; // no deletion pending — all good
+
+      const { scheduledAt } = snap.data();
+      const scheduledDate   = scheduledAt?.toDate ? scheduledAt.toDate() : new Date(scheduledAt);
+      const msElapsed       = Date.now() - scheduledDate.getTime();
+      const daysElapsed     = msElapsed / (1000 * 60 * 60 * 24);
+
+      if (daysElapsed >= DELETION_GRACE_DAYS) {
+        // Grace period expired — permanently delete and boot
+        await _hardDelete(user);
+        showAuth();
+        _showExpiredBanner();
+        return false;
+      }
+
+      // User came back within the grace period — cancel deletion
+      await deleteDoc(doc(db, 'deletion_queue', user.uid));
+      // Clear the pending flag from users doc too (in case it was set)
+      await updateDoc(doc(db, 'users', user.uid), {
+        deletionScheduledAt: null,
+        deletionPending: false
+      }).catch(() => {}); // ignore if field didn't exist
+
+      // Will show the "welcome back" banner after app loads
+      window._showDeletionCancelledBanner = true;
+      return true;
+
+    } catch(e) {
+      console.error('Deletion check error:', e);
+      return true; // on error, let the user in (safe fallback)
+    }
+  }
+
+  // ── Show a temporary full-screen notice after hard delete ──
+  function _showExpiredBanner() {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      position:fixed;inset:0;background:var(--bg,#0d1117);display:flex;
+      flex-direction:column;align-items:center;justify-content:center;
+      z-index:99999;padding:32px;text-align:center;
+    `;
+    el.innerHTML = `
+      <div style="font-size:3rem;margin-bottom:16px">🗑️</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:10px;color:#e8eaf0">
+        Account Permanently Deleted
+      </div>
+      <div style="font-family:'Newsreader',serif;font-size:.95rem;color:#6b7280;max-width:380px;line-height:1.7">
+        Your 30-day grace period expired and your account has been permanently removed.
+        All data has been wiped. Thank you for using LifeVault.
+      </div>
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 6000);
+  }
+
+  return { checkOnLogin };
+})();
+
+/* ── Schedule deletion (replaces instant hard-delete) ────── */
+window.confirmDeleteAccount = async () => {
+  const user = auth?.currentUser;
+  if (!user) return;
+
+  // Custom confirmation modal UI
+  const confirmed = await _showDeleteConfirmModal();
+  if (!confirmed) return;
+
+  try {
+    const scheduledAt = Timestamp.now();
+    const deleteDate  = new Date(Date.now() + DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000);
+
+    // Write to deletion_queue — this is the only thing that happens now
+    await setDoc(doc(db, 'deletion_queue', user.uid), {
+      uid:         user.uid,
+      email:       user.email,
+      displayName: user.displayName || '',
+      scheduledAt,
+      deleteAfter: Timestamp.fromDate(deleteDate),
+    });
+
+    // Also flag on the user doc so other parts of the app can read it
+    await updateDoc(doc(db, 'users', user.uid), {
+      deletionPending:    true,
+      deletionScheduledAt: scheduledAt,
+    }).catch(() => {});
+
+    toast('Account scheduled for deletion. You have 30 days to change your mind.', '🗑️');
+
+    // Sign out so the user sees the effect
+    if (feedUnsubscribe) feedUnsubscribe();
+    await fbSignOut(auth);
+
+  } catch(e) {
+    console.error(e);
+    toast('Error scheduling deletion: ' + e.message, '🔥');
+  }
+};
+
+/* ── Cancel deletion (callable from Settings page) ────────── */
+window.cancelAccountDeletion = async () => {
+  const user = auth?.currentUser;
+  if (!user) return;
+  try {
+    await deleteDoc(doc(db, 'deletion_queue', user.uid));
+    await updateDoc(doc(db, 'users', user.uid), {
+      deletionPending:     false,
+      deletionScheduledAt: null,
+    }).catch(() => {});
+    _hideDeletionBanner();
+    toast('Account deletion cancelled. Welcome back! 🎉', '✅');
+  } catch(e) {
+    toast('Error cancelling deletion: ' + e.message, '🔥');
+  }
+};
+
+/* ── Deletion status banner (shown inside the app) ─────────── */
+function _showDeletionBanner(daysLeft) {
+  // Remove any existing banner first
+  document.getElementById('deletion-banner')?.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'deletion-banner';
+  banner.style.cssText = `
+    position:fixed;top:0;left:0;right:0;z-index:9000;
+    background:linear-gradient(90deg,rgba(239,68,68,.15),rgba(239,68,68,.08));
+    border-bottom:1px solid rgba(239,68,68,.35);
+    padding:10px 20px;display:flex;align-items:center;justify-content:center;
+    gap:12px;flex-wrap:wrap;backdrop-filter:blur(8px);
+  `;
+  banner.innerHTML = `
+    <span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#fca5a5;font-weight:600">
+      🗑️ Your account is scheduled for deletion in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong>.
+      Sign back in before that to keep your account.
+    </span>
+    <button onclick="cancelAccountDeletion()" style="
+      background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);
+      color:#fca5a5;font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;
+      padding:5px 14px;border-radius:8px;cursor:pointer;transition:background .2s;
+      white-space:nowrap;
+    " onmouseover="this.style.background='rgba(239,68,68,.35)'"
+       onmouseout="this.style.background='rgba(239,68,68,.2)'">
+      Cancel Deletion
+    </button>
+  `;
+  document.body.prepend(banner);
+
+  // Push app content down so the banner doesn't overlap
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.style.paddingTop = (appEl.style.paddingTop || '0px') === '0px'
+    ? (banner.offsetHeight + 'px') : appEl.style.paddingTop;
+}
+
+function _hideDeletionBanner() {
+  const banner = document.getElementById('deletion-banner');
+  if (banner) {
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.style.paddingTop = '';
+    banner.remove();
+  }
+}
+
+/* ── Show banner if deletion is pending for logged-in user ── */
+async function _checkAndShowDeletionBanner(uid) {
+  try {
+    const snap = await getDoc(doc(db, 'deletion_queue', uid));
+    if (!snap.exists()) return;
+    const { scheduledAt } = snap.data();
+    const scheduledDate = scheduledAt?.toDate ? scheduledAt.toDate() : new Date(scheduledAt);
+    const msLeft  = (scheduledDate.getTime() + DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000) - Date.now();
+    const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+    _showDeletionBanner(daysLeft);
+  } catch(e) { /* silent */ }
+}
+
+/* ── "Welcome back" banner after auto-cancel ──────────────── */
+function _maybeShowWelcomeBackBanner() {
+  if (!window._showDeletionCancelledBanner) return;
+  window._showDeletionCancelledBanner = false;
+  const banner = document.createElement('div');
+  banner.style.cssText = `
+    position:fixed;top:0;left:0;right:0;z-index:9000;
+    background:linear-gradient(90deg,rgba(52,211,153,.15),rgba(52,211,153,.08));
+    border-bottom:1px solid rgba(52,211,153,.35);
+    padding:12px 20px;display:flex;align-items:center;justify-content:center;
+    gap:10px;backdrop-filter:blur(8px);
+  `;
+  banner.innerHTML = `
+    <span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#6ee7b7;font-weight:600">
+      🎉 Welcome back! Your account deletion has been automatically cancelled.
+    </span>
+    <button onclick="this.parentElement.remove()" style="
+      background:none;border:none;color:#6ee7b7;cursor:pointer;font-size:1.1rem;padding:0 4px;
+    ">×</button>
+  `;
+  document.body.prepend(banner);
+  setTimeout(() => banner.remove(), 8000);
+}
+
+/* ── Custom delete confirmation modal ────────────────────── */
+function _showDeleteConfirmModal() {
+  return new Promise(resolve => {
+    // Remove any stale instance
+    document.getElementById('delete-confirm-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'delete-confirm-modal';
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;
+      display:flex;align-items:center;justify-content:center;padding:24px;
+      backdrop-filter:blur(4px);
+    `;
+    overlay.innerHTML = `
+      <div style="
+        background:var(--surface,#161b22);border:1px solid rgba(239,68,68,.4);
+        border-radius:20px;padding:32px;max-width:440px;width:100%;
+        box-shadow:0 24px 64px rgba(0,0,0,.6);
+      ">
+        <div style="font-size:2.5rem;text-align:center;margin-bottom:16px">⚠️</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;
+                    text-align:center;margin-bottom:10px;color:#e8eaf0">
+          Delete Account?
+        </div>
+        <div style="font-family:'Newsreader',serif;font-size:.9rem;color:#9ca3af;
+                    text-align:center;line-height:1.7;margin-bottom:8px">
+          Your account will be <strong style="color:#fca5a5">scheduled for deletion</strong>.
+          You have <strong style="color:#fbbf24">30 days</strong> to log back in and cancel.
+        </div>
+        <div style="
+          background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);
+          border-radius:10px;padding:12px 16px;margin-bottom:24px;
+          font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#fcd34d;
+          line-height:1.6;
+        ">
+          ✦ All your journals, tasks, and goals will be preserved during the 30-day window.<br>
+          ✦ Simply sign back in at any time to cancel.<br>
+          ✦ After 30 days, all data is permanently and irreversibly deleted.
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button id="del-cancel-btn" style="
+            flex:1;padding:12px;border-radius:10px;border:1px solid var(--border,#30363d);
+            background:transparent;color:#9ca3af;font-family:'Syne',sans-serif;
+            font-size:.85rem;font-weight:600;cursor:pointer;transition:background .2s;
+          " onmouseover="this.style.background='rgba(255,255,255,.05)'"
+             onmouseout="this.style.background='transparent'">
+            Keep My Account
+          </button>
+          <button id="del-confirm-btn" style="
+            flex:1;padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,.5);
+            background:rgba(239,68,68,.15);color:#fca5a5;font-family:'Syne',sans-serif;
+            font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s;
+          " onmouseover="this.style.background='rgba(239,68,68,.3)'"
+             onmouseout="this.style.background='rgba(239,68,68,.15)'">
+            Schedule Deletion
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('del-cancel-btn').onclick  = () => { overlay.remove(); resolve(false); };
+    document.getElementById('del-confirm-btn').onclick = () => { overlay.remove(); resolve(true);  };
+    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   JOURNAL EXPAND
 ══════════════════════════════════════════════════════════════ */
 window.openExpandedJournal = id => {
   const e = journals.find(j => j.id === id);
@@ -270,11 +837,9 @@ document.addEventListener('keydown', e => {
 function initExpandableCards(container) {
   if (!container) return;
   container.onclick = e => {
-    // Photo clicks
     const photoEl = e.target.closest('[data-photo]');
     if (photoEl) { e.stopPropagation(); viewPhoto(photoEl.dataset.photo); return; }
 
-    // Action button clicks — stop propagation so they don't trigger expand
     const shareBtn = e.target.closest('[data-share]');
     if (shareBtn) { e.stopPropagation(); shareJournal(shareBtn.dataset.share); return; }
 
@@ -284,24 +849,20 @@ function initExpandableCards(container) {
     const delBtn = e.target.closest('[data-del]');
     if (delBtn) { e.stopPropagation(); delJournal(delBtn.dataset.del); return; }
 
-    // Community Post actions - these will only work if data-* attributes are added to post cards
     const likeBtn = e.target.closest('[data-like]');
     if (likeBtn) { e.stopPropagation(); toggleLike(likeBtn.dataset.like); return; }
 
     const userBtn = e.target.closest('[data-user]');
     if (userBtn) { e.stopPropagation(); openUserProfileModal(userBtn.dataset.user); return; }
 
-    // Expand — clicking anywhere on the card that isn't a button
     const entryEl = e.target.closest('.journal-entry, .post-card');
     if (entryEl) {
-      // For journals, toggle preview. For posts, open expanded view.
       if (entryEl.classList.contains('journal-entry')) {
         const preview = entryEl.querySelector('.entry-preview');
         if (preview) preview.classList.toggle('expanded');
       } else if (entryEl.classList.contains('post-card')) {
         const postId = entryEl.getAttribute('data-expand') || entryEl.getAttribute('data-post-id');
         if (postId) {
-          // Use the profile page's expanded post handler if available
           if (typeof window._profileOpenExpandedPost === 'function') {
             window._profileOpenExpandedPost(postId);
           } else if (typeof window.openExpandedPost === 'function') {
@@ -313,7 +874,7 @@ function initExpandableCards(container) {
   };
 }
 
-/* ══ RENDER JOURNALS — template literals, data-id delegation ══ */
+/* ══ RENDER JOURNALS ══════════════════════════════════════════ */
 function renderJournals(containerId, maxCount, isDash) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -372,7 +933,7 @@ window.selectMood = (val, emoji) => {
 };
 
 window.openJournalModal = (id = null) => {
-  if (!journals) return; // Don't open if data isn't loaded
+  if (!journals) return;
   editJournalId = id;
   photoUrls = [];
   document.getElementById('photo-preview').innerHTML = '';
@@ -491,7 +1052,7 @@ window.viewPhoto = url => {
 
 /* ══ TASKS ═══════════════════════════════════════════════════ */
 window.openTaskModal = (id = null) => {
-  if (!tasks) return; // Don't open if data isn't loaded
+  if (!tasks) return;
   editTaskId = id;
   document.getElementById('tmodal-title').textContent = id ? '✏️ Edit Task' : '✅ Add Task';
   if (id) {
@@ -734,14 +1295,6 @@ window.filterJournals = () => {
   journals = orig;
 };
 
-/* ══ EXPORT ══════════════════════════════════════════════════ */
-window.exportAsJSON = () => {
-  const blob = new Blob([JSON.stringify({journals,tasks,goals,exportedAt:new Date().toISOString(),user:currentUser?.email},null,2)],{type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `lifevault-backup-${Date.now()}.json`; a.click();
-  toast('Backup downloaded!','💾');
-};
-
 /* ══ RENDER ALL ══════════════════════════════════════════════ */
 function renderAll() {
   const streak = calcStreak();
@@ -756,7 +1309,6 @@ function renderAll() {
     document.getElementById('stat-mood').textContent = M_EMOJI[fav] || '😐';
   }
 
-  // ── use new renderJournals(containerId, limit, isDash) ──
   renderJournals('dash-journal-list', 3, true);
   renderJournals('journal-list');
 
@@ -783,7 +1335,7 @@ function subscribeFeed() {
   const q = query(collection(db,'community_posts'), orderBy('createdAt','desc'), limit(60));
   feedUnsubscribe = onSnapshot(q, snap => {
     feedPosts = snap.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
-    window.feedPosts = feedPosts; // Expose for debugging
+    window.feedPosts = feedPosts;
     renderFeed();
     updateCommStats();
     const activePage = document.querySelector('.page.active')?.id;
@@ -822,7 +1374,7 @@ window.postThought = async () => {
 };
 
 window.openShareModal = (type = 'journal') => {
-  if (!journals || !tasks || !goals) return; // Don't open if data isn't loaded
+  if (!journals || !tasks || !goals) return;
   const body = document.getElementById('share-modal-body');
   if (!body) return;
   if (type==='journal') {
@@ -878,7 +1430,7 @@ window.shareJournal = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Journal shared! 🌐','📓'); navigate('community');
+    toast('Journal shared! 🌐','📓'); navigateTo('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
@@ -893,7 +1445,7 @@ window.shareTask = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Task shared! 🌐','✅'); navigate('community');
+    toast('Task shared! 🌐','✅'); navigateTo('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
@@ -907,7 +1459,7 @@ window.shareGoal = async id => {
       authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
-    toast('Goal shared! 🌐','🎯'); navigate('community');
+    toast('Goal shared! 🌐','🎯'); navigateTo('community');
   } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
@@ -923,10 +1475,6 @@ function renderFeed() {
     return;
   }
   container.innerHTML = posts.map(p => renderPostCard(p)).join('');
-
-  // The new delegated handler will not work for post actions (like, comment, etc.)
-  // because renderPostCard uses inline onclicks, not data-* attributes.
-  // The handler is set up to ignore these buttons and only handle expansion.
   initExpandableCards(container);
 }
 
@@ -1173,20 +1721,15 @@ function applyProfileToUI() {
 
 function renderProfilePage() {
   applyProfileToUI();
-
   const postsEl = document.getElementById('profile-my-posts');
   if (!postsEl) return;
-
-  // Check privacy setting from the pre-loaded userProfile object. Default to public.
   const isPublic = userProfile.isPublic !== false;
-
   if (isPublic) {
     const myPosts = feedPosts.filter(p => p.authorId === currentUser?.uid);
     postsEl.innerHTML = myPosts.length
       ? myPosts.map(p => renderPostCard(p)).join('')
-      : `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🌐</div><div class="empty-title">No posts yet</div><div class="empty-sub">Share something with the community!</div><button class="btn btn-primary" style="margin-top:16px" onclick="navigate('community')">Go to Community</button></div>`;
+      : `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🌐</div><div class="empty-title">No posts yet</div><div class="empty-sub">Share something with the community!</div><button class="btn btn-primary" style="margin-top:16px" onclick="navigateTo('community')">Go to Community</button></div>`;
   } else {
-    // If profile is private, show a message instead of the posts.
     postsEl.innerHTML = `<div class="feed-empty" style="padding:32px"><div class="empty-icon">🔒</div><div class="empty-title">This Profile is Private</div><div class="empty-sub">This user's activity is not shared publicly.</div></div>`;
   }
 }
@@ -1245,39 +1788,24 @@ window.saveAvatar = async () => {
   catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
-/* ══════════════════════════════════════════════════════════════
-   COVER MODAL  —  hex-based gradient generator
-══════════════════════════════════════════════════════════════ */
+/* ══ COVER MODAL ═════════════════════════════════════════════ */
 window.openCoverModal = () => {
   selectedCoverData = { value: userProfile.coverGradient || COVER_PRESETS[0] };
-
-  // Preset grid
   const grid = document.getElementById('cover-preset-grid');
   grid.innerHTML = COVER_PRESETS.map((grad, i) =>
     `<div class="cover-preset ${userProfile.coverGradient===grad?'selected':''}"
       style="background:${grad}" onclick="selectCoverPreset('${grad}',this)"></div>`
   ).join('');
-
-  // Live preview
   document.getElementById('cover-live-preview').style.background = selectedCoverData.value;
   document.getElementById('hex-text-input').value = '';
   document.getElementById('hex-color-wheel').value = '#4f8ef7';
-
-  // Sync color wheel → text input → live preview
   const wheel = document.getElementById('hex-color-wheel');
   const textIn = document.getElementById('hex-text-input');
-  wheel.oninput = () => {
-    textIn.value = wheel.value;
-    previewHexGradient(wheel.value);
-  };
+  wheel.oninput = () => { textIn.value = wheel.value; previewHexGradient(wheel.value); };
   textIn.oninput = () => {
     const hex = textIn.value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-      wheel.value = hex;
-      previewHexGradient(hex);
-    }
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) { wheel.value = hex; previewHexGradient(hex); }
   };
-
   document.getElementById('cover-modal').classList.add('open');
 };
 
@@ -1287,45 +1815,32 @@ function hexToRgb(hex) {
   const b = parseInt(hex.slice(5,7),16);
   return {r,g,b};
 }
-
 function darken(hex, factor) {
   const {r,g,b} = hexToRgb(hex);
   const d = v => Math.round(Math.max(0, v*factor)).toString(16).padStart(2,'0');
   return `#${d(r)}${d(g)}${d(b)}`;
 }
-
 function hexToGradient(hex) {
-  // Build: very dark base → mid tone of user color → ultra dark
-  const mid  = darken(hex, 0.55);  // 55% brightness of user color
-  const dark = darken(hex, 0.18);  // very dark tint
+  const mid  = darken(hex, 0.55);
+  const dark = darken(hex, 0.18);
   const ultra = darken(hex, 0.1);
   return `linear-gradient(135deg,${dark},${mid},${ultra})`;
 }
-
 function previewHexGradient(hex) {
   const grad = hexToGradient(hex);
   document.getElementById('cover-live-preview').style.background = grad;
-  // Deselect presets
   document.querySelectorAll('.cover-preset').forEach(p=>p.classList.remove('selected'));
   selectedCoverData = { value: grad };
 }
-
 window.applyHexCover = () => {
   const textIn = document.getElementById('hex-text-input');
   const wheel  = document.getElementById('hex-color-wheel');
   let hex = textIn.value.trim();
-  // Accept shorthand like #fff → #ffffff
-  if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
-    hex = '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
-  }
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-    // Fall back to color wheel
-    hex = wheel.value;
-  }
+  if (/^#[0-9a-fA-F]{3}$/.test(hex)) hex = '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) hex = wheel.value;
   previewHexGradient(hex);
   toast('Preview updated!','🎨');
 };
-
 window.selectCoverPreset = (grad, el) => {
   selectedCoverData = { value: grad };
   document.querySelectorAll('.cover-preset').forEach(p=>p.classList.remove('selected'));
@@ -1343,46 +1858,6 @@ window.saveCover = async () => {
     closeModal('cover-modal');
     toast('Cover updated!','🖼');
   } catch(e) { toast('Error: '+e.message,'❌'); }
-};
-
-/* ══════════════════════════════════════════════════════════════
-   SETTINGS PAGE HANDLERS
-══════════════════════════════════════════════════════════════ */
-// NOTE: These are placeholder handlers for a potential future settings page.
-// Much of this functionality is already implemented in the Profile page modals.
-
-window.renderSettingsPage = () => {
-    console.log("Rendering settings page...");
-    // This is a placeholder. A real implementation would populate
-    // form fields on a dedicated #page-settings element.
-};
-
-// Corresponds to existing saveProfile()
-window.saveProfileSettings = async () => {
-    alert('Profile settings saved! (Placeholder)');
-    // In a real implementation, this would read from settings page inputs
-    // and call setUserProfile().
-};
-
-// Corresponds to existing saveAvatar() and saveCover()
-window.saveAppearanceSettings = () => {
-    alert('Appearance settings saved! (Placeholder)');
-};
-
-// Corresponds to existing exportAsJSON()
-window.exportUserData = () => {
-    exportAsJSON();
-};
-
-// New functionality: Account deletion
-window.deleteUserData = () => {
-    if (!confirm('Are you absolutely sure you want to delete your account and all data? This action cannot be undone.')) {
-        return;
-    }
-    // DANGER: This is a placeholder. A real implementation would require a
-    // secure, multi-step process, likely involving a backend function
-    // to delete all user data from Firestore and then delete the auth user.
-    alert('Your account is being deleted. You will be logged out. (Placeholder)');
 };
 
 /* ══ IMAGE COMPRESSION ════════════════════════════════════════ */
@@ -1422,18 +1897,9 @@ document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('cl
 }));
 
 window.openUserProfileModal = async (userId) => {
-  console.log('[Debug] openUserProfileModal called for userId:', userId);
-  if (!userId) {
-    console.log('[Debug] No userId provided, returning.');
-    return;
-  }
+  if (!userId) return;
   const modal = document.getElementById('user-profile-modal');
-  if (!modal) {
-    console.log('[Debug] user-profile-modal element not found, returning.');
-    return;
-  }
-
-  // Reset and show loading state
+  if (!modal) return;
   modal.classList.add('open');
   document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div>';
   document.getElementById('upm-name').textContent = 'Loading...';
@@ -1444,67 +1910,43 @@ window.openUserProfileModal = async (userId) => {
   document.getElementById('upm-stat-posts').textContent = '—';
   document.getElementById('upm-stat-likes').textContent = '—';
   document.getElementById('upm-stat-joined').textContent = '—';
-
   try {
-    console.log(`[Debug] Fetching user document: users/${userId}`);
     const userSnap = await getDoc(doc(db, 'users', userId));
-
     if (!userSnap.exists()) {
-      console.log('[Debug] User document does not exist.');
       document.getElementById('upm-name').textContent = 'User Not Found';
       document.getElementById('upm-username').textContent = `@unknown_user`;
-      document.getElementById('upm-bio').textContent = 'This user profile could not be loaded. The user may have been deleted.';
+      document.getElementById('upm-bio').textContent = 'This user profile could not be loaded.';
       document.getElementById('upm-avatar').src = 'https://ui-avatars.com/api/?name=?&background=374151&color=fff';
-      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🤷‍♂️</div>';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="text-align:center;padding:8px">🤷‍♂️</div>';
       return;
     }
-
-    const userProfile = userSnap.data();
-    console.log('[Debug] User profile data fetched:', userProfile);
-
-    // Assume public profile data is stored directly on the user document
-    const isPublic = userProfile.isPublic !== false;
-    console.log('[Debug] Is profile public?', isPublic);
-
+    const uProf = userSnap.data();
+    const isPublic = uProf.isPublic !== false;
     if (!isPublic) {
       document.getElementById('upm-name').textContent = 'Profile is Private';
       document.getElementById('upm-bio').textContent = 'This user prefers to keep things private.';
-      document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px;text-align:center;">🔒</div>';
+      document.getElementById('upm-posts-list').innerHTML = '<div style="text-align:center;padding:8px">🔒</div>';
       return;
     }
-
-    // Populate modal with user data
-    document.getElementById('upm-name').textContent = userProfile.displayName || 'Anonymous';
-    document.getElementById('upm-username').textContent = userProfile.username ? `@${userProfile.username}` : '';
-    document.getElementById('upm-bio').textContent = userProfile.bio || 'No bio yet.';
-    document.getElementById('upm-avatar').src = userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.displayName||'U')}&background=4f8ef7&color=fff`;
-    document.getElementById('upm-cover').style.background = userProfile.coverGradient || 'linear-gradient(135deg, #0d1b2a, #1b3a5c)';
-    document.getElementById('upm-stat-joined').textContent = userProfile.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('en-us', { month: 'short', year: 'numeric' }) : '—';
-
-    // Load user's posts and stats
-    const postsQuery = query(collection(db, 'community_posts'), where('authorId', '==', userId), orderBy('createdAt', 'desc'), limit(10));
-    const postsSnap = await getDocs(postsQuery);
-    const userPosts = postsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
+    document.getElementById('upm-name').textContent = uProf.displayName || 'Anonymous';
+    document.getElementById('upm-username').textContent = uProf.username ? `@${uProf.username}` : '';
+    document.getElementById('upm-bio').textContent = uProf.bio || 'No bio yet.';
+    document.getElementById('upm-avatar').src = uProf.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(uProf.displayName||'U')}&background=4f8ef7&color=fff`;
+    document.getElementById('upm-cover').style.background = uProf.coverGradient || 'linear-gradient(135deg,#0d1b2a,#1b3a5c)';
+    document.getElementById('upm-stat-joined').textContent = uProf.joinedAt ? new Date(uProf.joinedAt).toLocaleDateString('en-us',{month:'short',year:'numeric'}) : '—';
+    const postsSnap = await getDocs(query(collection(db,'community_posts'), where('authorId','==',userId), orderBy('createdAt','desc'), limit(10)));
+    const userPosts = postsSnap.docs.map(d => ({id:d.id,...d.data()}));
     document.getElementById('upm-stat-posts').textContent = userPosts.length;
-    const totalLikes = userPosts.reduce((acc, post) => acc + (post.likes?.length || 0), 0);
-    document.getElementById('upm-stat-likes').textContent = totalLikes;
-
+    document.getElementById('upm-stat-likes').textContent = userPosts.reduce((acc,p)=>acc+(p.likes?.length||0),0);
     const postsListEl = document.getElementById('upm-posts-list');
-    if (userPosts.length === 0) {
-      postsListEl.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No recent posts.</div>';
-    } else {
-      postsListEl.innerHTML = userPosts.map(p => `
-        <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem">
-          <a href="#" onclick="event.preventDefault(); closeUserProfileModal(); openExpandedPost('${p.id}');" style="color:var(--text);text-decoration:none;font-weight:600">${esc(p.title || p.body.substring(0, 50) + '...')}</a>
+    postsListEl.innerHTML = userPosts.length
+      ? userPosts.map(p=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <a href="#" onclick="event.preventDefault();closeUserProfileModal();openExpandedPost('${p.id}');" style="color:var(--text);text-decoration:none;font-weight:600">${esc(p.title||p.body?.substring(0,50)+'...')}</a>
           <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:3px">${relativeTime(p.createdAt)}</div>
-        </div>
-      `).join('');
-    }
-
-  } catch (error) {
+        </div>`).join('')
+      : '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No recent posts.</div>';
+  } catch(error) {
     console.error("Error loading user profile:", error);
-    console.log('[Debug] An error occurred in openUserProfileModal:', error);
     document.getElementById('upm-name').textContent = 'Error loading profile';
   }
 };
@@ -1513,6 +1955,7 @@ window.closeUserProfileModal = () => {
   const modal = document.getElementById('user-profile-modal');
   if (modal) modal.classList.remove('open');
 };
+
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1528,72 +1971,46 @@ window.toast = (msg, icon='✨') => {
   setTimeout(() => { t.classList.add('out'); setTimeout(()=>t.remove(), 300); }, 3000);
 };
 
-// ─── GLOBAL EXPANDED POST HANDLER ─────────────────────────
+/* ══ GLOBAL EXPANDED POST HANDLER ════════════════════════════ */
 window.openExpandedPost = function(postId) {
   if(!postId || !window.feedPosts) return;
   const p = window.feedPosts.find(x => x.id === postId);
   if(!p) return;
-
   window._expandedPostId = postId;
   const cu = window.currentUser;
   const isOwn = p.authorId === cu?.uid;
   const liked = (p.likes||[]).includes(cu?.uid);
-
-  // Type badges (from main JS)
-  const TYPE_BADGES = {thought:'💭 Thought',journal:'📓 Journal',task:'✅ Task',goal:'🎯 Goal'};
-  const TYPE_BADGE_CLASS = {thought:'badge-journal',journal:'badge-journal',task:'badge-task',goal:'badge-goal'};
   const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
-
-  // Try profile page overlay first, then community page overlay
   const profileOverlay = document.getElementById('post-expand-overlay');
   const communityOverlay = document.getElementById('post-expand-overlay-comm');
   const overlay = profileOverlay || communityOverlay;
   const prefix = profileOverlay ? 'pexp' : 'exp';
-
-  if(!overlay) return; // No overlay available
-
-  // Set up header
-  const avatarEl = document.getElementById(prefix + '-avatar');
-  const timeEl = document.getElementById(prefix + '-time');
-  const authorEl = document.getElementById(prefix + '-author-row');
-  
+  if(!overlay) return;
+  const avatarEl = document.getElementById(prefix+'-avatar');
+  const timeEl   = document.getElementById(prefix+'-time');
+  const authorEl = document.getElementById(prefix+'-author-row');
   if(avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
-  if(timeEl) timeEl.textContent = new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year: new Date(p.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined});
-  
+  if(timeEl)   timeEl.textContent = new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   if(authorEl) {
-    const handleFromPost = p.authorUsername || (p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user';
+    const handle = p.authorUsername || (p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user';
     authorEl.innerHTML = `
-      <button class="post-author-btn"
-              onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
-              style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;
-                     display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .2s"
-              onmouseover="this.style.color='var(--accent)'"
-              onmouseout="this.style.color=''">
+      <button class="post-author-btn" onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
+        style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .2s"
+        onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color=''">
         <span style="font-size:.82rem;font-weight:700;color:var(--text)">${esc(p.authorName||'Anonymous')}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">@${esc(handleFromPost)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">@${esc(handle)}</span>
       </button>
       <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>
-      ${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>` : ''}`;
+      ${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}`;
   }
-
-  // Build body HTML
   let bodyHtml = '';
   if(p.title) bodyHtml += `<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3">${esc(p.title)}</div>`;
-
-  if(p.type === 'goal'){
-    bodyHtml += `<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px">
-      <div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${p.progress||0}%"></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px">
-      <span>${p.categoryIcon||'🎯'} ${esc(p.title||'')}</span><span>${p.progress||0}% complete</span>
-    </div>
+  if(p.type==='goal'){
+    bodyHtml += `<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px"><div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${p.progress||0}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px"><span>${p.categoryIcon||'🎯'} ${esc(p.title||'')}</span><span>${p.progress||0}% complete</span></div>
     ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
-  } else if(p.type === 'task'){
-    bodyHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <span>${p.priorityIcon||'✅'}</span>
-      <span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>
-      ${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}
-    </div>
+  } else if(p.type==='task'){
+    bodyHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span>${p.priorityIcon||'✅'}</span><span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}</div>
     ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
   } else {
     if(p.moodEmoji) bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`;
@@ -1601,260 +2018,110 @@ window.openExpandedPost = function(postId) {
     if(p.photoUrls?.length) bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${p.photoUrls.map(u=>`<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`;
     if(p.tags?.length) bodyHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`;
   }
-
-  // Comments section
   const myAvatar = cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
   bodyHtml += `<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
-    <div id="${prefix}-comments-list" style="margin-bottom:12px">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div>
-    </div>
+    <div id="${prefix}-comments-list" style="margin-bottom:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div></div>
     <div class="comment-input-row">
       <img src="${esc(myAvatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
-      <input class="comment-input" id="${prefix}-comment-input" placeholder="Write a comment…"
-             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
+      <input class="comment-input" id="${prefix}-comment-input" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
       <button class="comment-submit" onclick="window._submitCommentGlobal('${postId}')">↵</button>
     </div>
   </div>`;
-
-  const bodyEl = document.getElementById(prefix + '-body');
+  const bodyEl = document.getElementById(prefix+'-body');
   if(bodyEl) bodyEl.innerHTML = bodyHtml;
-
-  // Footer with actions
-  const footerEl = document.getElementById(prefix + '-footer');
+  const footerEl = document.getElementById(prefix+'-footer');
   if(footerEl) {
     footerEl.innerHTML = `
-      <button class="post-action-btn ${liked?'liked':''}" id="${prefix}-like-btn"
-              onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
+      <button class="post-action-btn ${liked?'liked':''}" id="${prefix}-like-btn" onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
         <span class="heart-icon">${liked?'❤️':'🤍'}</span>
         <span id="${prefix}-like-count" class="post-action-count">${(p.likes||[]).length||''}</span>
       </button>
-      <button class="post-action-btn" onclick="event.stopPropagation();repost('${postId}')">
-        🔁 <span class="post-action-count">${p.repostCount||''}</span>
-      </button>
-      ${isOwn ? `<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>` : ''}`;
+      <button class="post-action-btn" onclick="event.stopPropagation();repost('${postId}')">🔁 <span class="post-action-count">${p.repostCount||''}</span></button>
+      ${isOwn?`<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>`:''}`;
   }
-
-  // Show overlay
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
-
-  // Load comments
   window._loadCommentsGlobal(postId);
 };
 
 window.closeExpandedPost = function() {
-  const profileOverlay = document.getElementById('post-expand-overlay');
-  const communityOverlay = document.getElementById('post-expand-overlay-comm');
-  const overlay = profileOverlay || communityOverlay;
+  const overlay = document.getElementById('post-expand-overlay') || document.getElementById('post-expand-overlay-comm');
   if(overlay) overlay.classList.remove('open');
   document.body.style.overflow = '';
   window._expandedPostId = null;
 };
 
-// Global comment helpers
 window._submitCommentGlobal = async function(postId) {
   const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
-  const input = document.getElementById(prefix + '-comment-input');
-  const text = input.value.trim();
-  if(!text) return;
-
+  const input = document.getElementById(prefix+'-comment-input');
+  const text = input.value.trim(); if(!text) return;
   const user = window.auth.currentUser;
-  if(!user) { window.toast && window.toast('Not logged in', '⚠️'); return; }
-
+  if(!user) { window.toast && window.toast('Not logged in','⚠️'); return; }
   try {
-    const { collection, addDoc, serverTimestamp } = window._fbFS;
-    await addDoc(collection(window.db, 'community_posts', postId, 'comments'), {
-      authorId:   user.uid,
-      authorName: user.displayName || 'Anonymous',
-      authorAvatar: user.photoURL || '',
-      text:       text,
-      createdAt:  serverTimestamp(),
-      likes:      []
+    await addDoc(collection(db,'community_posts',postId,'comments'), {
+      authorId:user.uid, authorName:user.displayName||'Anonymous',
+      authorAvatar:user.photoURL||'', text, createdAt:serverTimestamp(), likes:[]
     });
     input.value = '';
     window._loadCommentsGlobal(postId);
-  } catch(e) {
-    console.error(e);
-    window.toast && window.toast('Error posting comment', '🔥');
-  }
+  } catch(e) { console.error(e); window.toast && window.toast('Error posting comment','🔥'); }
 };
 
 window._loadCommentsGlobal = function(postId) {
-  if(!window.db) return;
+  if(!db) return;
   const prefix = document.getElementById('post-expand-overlay') ? 'pexp' : 'exp';
-  const { collection, query, orderBy, onSnapshot } = window._fbFS;
-  const q = query(
-    collection(window.db, 'community_posts', postId, 'comments'),
-    orderBy('createdAt', 'asc')
-  );
+  const q = query(collection(db,'community_posts',postId,'comments'), orderBy('createdAt','asc'));
   onSnapshot(q, snap => {
-    const comments = snap.docs.map(d => ({id:d.id, ...d.data()}));
-    const list = document.getElementById(prefix + '-comments-list');
+    const comments = snap.docs.map(d => ({id:d.id,...d.data()}));
+    const list = document.getElementById(prefix+'-comments-list');
     if(!list) return;
-    
-    if(!comments.length){
-      list.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;
-                             color:var(--muted);text-align:center;padding:8px">No comments yet. Start the conversation!</div>`;
-    } else {
-      list.innerHTML = comments.map(c => `
+    list.innerHTML = comments.length
+      ? comments.map(c=>`
         <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:8px">
               <img src="${esc(c.authorAvatar)}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
               <span style="font-weight:600;font-size:.8rem">${esc(c.authorName)}</span>
             </div>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)">${relC(c.createdAt)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)">${relativeTime(c.createdAt?.toDate?.() || c.createdAt)}</span>
           </div>
           <div style="font-size:.85rem;color:rgba(232,234,240,.8);line-height:1.6;margin-left:32px">${esc(c.text)}</div>
-        </div>`).join('');
-    }
+        </div>`).join('')
+      : `<div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-align:center;padding:8px">No comments yet. Start the conversation!</div>`;
   });
 };
 
 window._toggleLikeGlobal = async function(postId) {
-  const user = window.auth.currentUser;
-  if(!user) return;
-
-  const p = window.feedPosts?.find(x => x.id === postId);
-  if(!p) return;
-
+  const user = window.auth.currentUser; if(!user) return;
+  const p = window.feedPosts?.find(x=>x.id===postId); if(!p) return;
   const isLiked = (p.likes||[]).includes(user.uid);
-  const newLikes = isLiked 
-    ? (p.likes||[]).filter(id => id !== user.uid)
-    : [...(p.likes||[]), user.uid];
-
   try {
-    const { doc, updateDoc } = window._fbFS;
-    await updateDoc(doc(window.db, 'community_posts', postId), { likes: newLikes });
-  } catch(e) {
-    console.error(e);
-  }
+    await updateDoc(doc(db,'community_posts',postId), {
+      likes: isLiked ? arrayRemove(user.uid) : arrayUnion(user.uid)
+    });
+  } catch(e) { console.error(e); }
 };
 
-// ─── LEARNING RESOURCES INITIALIZATION ──────────────────
+/* ══ LEARNING RESOURCES ══════════════════════════════════════ */
 let learningResourcesInitialized = false;
 async function initializeLearningResources() {
   if (learningResourcesInitialized) return;
   learningResourcesInitialized = true;
-
   try {
-    const { collection, getDocs } = window._fbFS;
-    const snap = await getDocs(collection(window.db, 'learning_resources'));
-    
-    // If resources already exist, skip initialization
+    const snap = await getDocs(collection(db,'learning_resources'));
     if(snap.docs.length > 0) return;
-
-    // Initialize with sample learning resources
-    const { addDoc } = window._fbFS;
     const sampleResources = [
-      {
-        title: 'Python for Data Science',
-        type: 'course',
-        platform: 'Coursera',
-        difficulty: 'Intermediate',
-        rating: 4.8,
-        link: 'https://coursera.org/learn/python-for-data-science',
-        description: 'Complete Python course for data science applications',
-        tags: ['python', 'data science', 'programming']
-      },
-      {
-        title: 'Learn Machine Learning',
-        type: 'course',
-        platform: 'Coursera',
-        difficulty: 'Advanced',
-        rating: 4.9,
-        link: 'https://coursera.org/specializations/machine-learning',
-        description: 'Deep dive into ML algorithms and applications',
-        tags: ['machine learning', 'ai', 'data science']
-      },
-      {
-        title: 'Web Development Bootcamp',
-        type: 'course',
-        platform: 'Udemy',
-        difficulty: 'Beginner',
-        rating: 4.7,
-        link: 'https://udemy.com/web-development',
-        description: 'Full stack web development from scratch',
-        tags: ['web development', 'javascript', 'html', 'css']
-      },
-      {
-        title: 'React.js Tutorial',
-        type: 'tutorial',
-        platform: 'YouTube',
-        difficulty: 'Intermediate',
-        rating: 4.6,
-        link: 'https://youtube.com/react-tutorial',
-        description: 'Learn modern React development',
-        tags: ['react', 'javascript', 'web development']
-      },
-      {
-        title: 'The Complete SQL Bootcamp',
-        type: 'course',
-        platform: 'Udemy',
-        difficulty: 'Beginner',
-        rating: 4.8,
-        link: 'https://udemy.com/sql-bootcamp',
-        description: 'Master SQL and database design',
-        tags: ['sql', 'database', 'programming']
-      },
-      {
-        title: 'AI Engineering Guide',
-        type: 'article',
-        platform: 'Medium',
-        difficulty: 'Intermediate',
-        rating: 4.5,
-        link: 'https://medium.com/ai-engineering',
-        description: 'Best practices for AI engineering',
-        tags: ['ai', 'machine learning', 'engineering']
-      },
-      {
-        title: 'Cloud Computing with AWS',
-        type: 'course',
-        platform: 'Linux Academy',
-        difficulty: 'Intermediate',
-        rating: 4.7,
-        link: 'https://linuxacademy.com/aws',
-        description: 'AWS cloud services and deployment',
-        tags: ['aws', 'cloud', 'devops']
-      },
-      {
-        title: 'JavaScript ES6+ Guide',
-        type: 'article',
-        platform: 'Dev.to',
-        difficulty: 'Intermediate',
-        rating: 4.6,
-        link: 'https://dev.to/javascript',
-        description: 'Modern JavaScript best practices',
-        tags: ['javascript', 'programming', 'web development']
-      },
-      {
-        title: 'UI/UX Design Principles',
-        type: 'course',
-        platform: 'Skillshare',
-        difficulty: 'Beginner',
-        rating: 4.7,
-        link: 'https://skillshare.com/ui-ux',
-        description: 'Fundamentals of UI/UX design',
-        tags: ['design', 'ui', 'ux']
-      },
-      {
-        title: 'Git & GitHub Essentials',
-        type: 'tutorial',
-        platform: 'GitHub Learning',
-        difficulty: 'Beginner',
-        rating: 4.8,
-        link: 'https://github.com/skills',
-        description: 'Version control and collaboration',
-        tags: ['git', 'github', 'programming']
-      }
+      { title:'Python for Data Science', type:'course', platform:'Coursera', difficulty:'Intermediate', rating:4.8, link:'https://coursera.org/learn/python-for-data-science', description:'Complete Python course for data science applications', tags:['python','data science','programming'] },
+      { title:'Learn Machine Learning', type:'course', platform:'Coursera', difficulty:'Advanced', rating:4.9, link:'https://coursera.org/specializations/machine-learning', description:'Deep dive into ML algorithms and applications', tags:['machine learning','ai','data science'] },
+      { title:'Web Development Bootcamp', type:'course', platform:'Udemy', difficulty:'Beginner', rating:4.7, link:'https://udemy.com/web-development', description:'Full stack web development from scratch', tags:['web development','javascript','html','css'] },
+      { title:'React.js Tutorial', type:'tutorial', platform:'YouTube', difficulty:'Intermediate', rating:4.6, link:'https://youtube.com/react-tutorial', description:'Learn modern React development', tags:['react','javascript','web development'] },
+      { title:'The Complete SQL Bootcamp', type:'course', platform:'Udemy', difficulty:'Beginner', rating:4.8, link:'https://udemy.com/sql-bootcamp', description:'Master SQL and database design', tags:['sql','database','programming'] },
+      { title:'AI Engineering Guide', type:'article', platform:'Medium', difficulty:'Intermediate', rating:4.5, link:'https://medium.com/ai-engineering', description:'Best practices for AI engineering', tags:['ai','machine learning','engineering'] },
+      { title:'Cloud Computing with AWS', type:'course', platform:'Linux Academy', difficulty:'Intermediate', rating:4.7, link:'https://linuxacademy.com/aws', description:'AWS cloud services and deployment', tags:['aws','cloud','devops'] },
+      { title:'JavaScript ES6+ Guide', type:'article', platform:'Dev.to', difficulty:'Intermediate', rating:4.6, link:'https://dev.to/javascript', description:'Modern JavaScript best practices', tags:['javascript','programming','web development'] },
+      { title:'UI/UX Design Principles', type:'course', platform:'Skillshare', difficulty:'Beginner', rating:4.7, link:'https://skillshare.com/ui-ux', description:'Fundamentals of UI/UX design', tags:['design','ui','ux'] },
+      { title:'Git & GitHub Essentials', type:'tutorial', platform:'GitHub Learning', difficulty:'Beginner', rating:4.8, link:'https://github.com/skills', description:'Version control and collaboration', tags:['git','github','programming'] },
     ];
-
-    for(const resource of sampleResources) {
-      await addDoc(collection(window.db, 'learning_resources'), resource);
-    }
-
-    console.log('Learning resources initialized');
-  } catch(e) {
-    console.warn('Error initializing learning resources:', e.message);
-  }
+    for(const r of sampleResources) await addDoc(collection(db,'learning_resources'), r);
+  } catch(e) { console.warn('Error initializing learning resources:', e.message); }
 }

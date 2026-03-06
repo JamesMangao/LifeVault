@@ -1,4 +1,4 @@
-+56+0<0.!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -19,11 +19,6 @@
             appId: "{{ config('services.firebase.app_id') }}",
             measurementId: "{{ config('services.firebase.measurement_id') }}"
         };
-
-        // Hugging Face API Configuration
-        // 🔑 IMPORTANT: Replace with your actual Hugging Face API token
-        // Get it from: https://huggingface.co/settings/tokens
-        window.huggingfaceApiKey = "{{ config('services.huggingface.api_key', 'YOUR_HUGGINGFACE_API_TOKEN_HERE') }}";
     </script>
 
     <style>
@@ -129,6 +124,7 @@
             @include('life-story')
             @include('settings')
             @include('profile')
+            @include('saved')
         </div>
     </div>
 
@@ -203,8 +199,40 @@
     @include('layouts.partials._toast')
     @include('layouts.partials._journal-expand')
 
-    <script src="{{ asset('js/app.js') }}?v={{ time() }}" type="module"></script>
-    @stack('scripts')
+    <script>
+// Early-define savedAddItem so save buttons work on any page
+// before saved.blade.php's @push('scripts') has fired.
+(function () {
+    var LS_KEY = 'lifevault_saved_items';
+
+    function loadItems() {
+        try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch (e) { return []; }
+    }
+
+    function persistItems(items) {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(items)); } catch (e) {}
+    }
+
+    window.savedAddItem = function (item) {
+        var items = loadItems();
+        var newItem = Object.assign({}, item, {
+            id: Date.now() + Math.random().toString(36).slice(2),
+            savedAt: new Date().toISOString()
+        });
+        items.unshift(newItem);
+        persistItems(items);
+
+        // If saved page is already mounted and has registered its renderer, call it
+        if (typeof window._savedRender === 'function') window._savedRender();
+
+        if (typeof window.toast === 'function') window.toast('Saved to 🔖 Saved Items! ✨');
+    };
+})();
+</script>
+
+{{-- Then your existing lines follow: --}}
+<script src="{{ asset('js/app.js') }}?v={{ time() }}" type="module"></script>
+@stack('scripts')
 
 </body>
 </html>
