@@ -45,7 +45,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="closeModal('journal-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveJournalEntry()">Save Entry</button>
+      <button class="btn btn-primary progress-illusion" onclick="saveJournalEntry()">Save Entry</button>
     </div>
   </div>
 </div>
@@ -59,7 +59,7 @@
     <div class="form-group"><label class="form-label">Note (optional)</label><input type="text" class="form-input" id="task-note" placeholder="Any details..."></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="closeModal('task-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+      <button class="btn btn-primary progress-illusion" onclick="saveTask()">Save Task</button>
     </div>
   </div>
 </div>
@@ -73,7 +73,7 @@
     <div class="form-group"><label class="form-label">Target</label><input type="text" class="form-input" id="goal-target" placeholder="e.g. Read 12 books, Run 5km..."></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="closeModal('goal-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveGoal()">Create Goal</button>
+      <button class="btn btn-primary progress-illusion" onclick="saveGoal()">Create Goal</button>
     </div>
   </div>
 </div>

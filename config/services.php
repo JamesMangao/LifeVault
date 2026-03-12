@@ -51,6 +51,16 @@ return [
     'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
     ],
 
+    // configuration for the Holistic Career Advisor AI provider
+    // you can point this at any compatible LLM service other than
+    // gemini/groq/openrouter/cerebras.  The response must return
+    // Markdown text (either in Gemini or OpenAI format).
+    'hca' => [
+        'provider' => env('HCA_PROVIDER', 'gemini'),
+        'url'      => env('HCA_API_URL'),
+        'key'      => env('HCA_API_KEY'),
+    ],
+
     'openrouter' => [
         'key'   => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct:free'),

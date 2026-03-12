@@ -9,8 +9,10 @@
       </div>
       <div class="page-subtitle">Upload your resume and a job description to get an AI-powered analysis and match score</div>
     </div>
-    {{-- Analyze button in header, matching shadow/life-story pattern --}}
-    <button class="btn" id="analyzeTopBtn" onclick="document.getElementById('analysisForm').requestSubmit()" disabled
+    {{-- Top "Analyze Resume" button — mirrors the submit button below --}}
+    <button class="btn" id="analyzeTopBtn"
+            onclick="document.getElementById('analysisForm').requestSubmit()"
+            disabled
             style="background:linear-gradient(135deg,rgba(79,142,247,.15),rgba(45,212,191,.15));border-color:rgba(79,142,247,.35);color:var(--accent);font-weight:700">
       🔍 Analyze Resume
     </button>
@@ -115,6 +117,7 @@
           </div>
         </div>
 
+
       </div>
 
       {{-- ══════════════════════════════════════
@@ -205,7 +208,6 @@
 
         {{-- Action Buttons --}}
         <div id="ra-actions" style="display:none;flex-direction:column;gap:10px">
-          {{-- Save to Saved Items (matches shadow/story style) --}}
           <button type="button" id="saveAnalysisBtn" onclick="saveResumeToSaved()" class="ra-btn-save">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -227,7 +229,7 @@
   </form>
 </div>
 
-{{-- Styles (unchanged from original) --}}
+{{-- ══ STYLES ══════════════════════════════════════════════════ --}}
 <style>
 @keyframes ra-spin   { to { transform:rotate(360deg) } }
 @keyframes ra-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
@@ -258,6 +260,7 @@
 .ra-textarea:focus { border-color:rgba(79,142,247,.5); background:rgba(79,142,247,.02); box-shadow:0 0 0 3px rgba(79,142,247,.08); }
 .ra-jd-count { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); margin-left:auto; font-weight:400; }
 
+/* ── Primary submit button ── */
 .ra-analyze-btn { width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),#3b6fd4); border:none; border-radius:12px; color:white; font-family:'Syne',sans-serif; font-size:.88rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
 .ra-analyze-btn::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.08),transparent); pointer-events:none; }
 .ra-analyze-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 24px rgba(79,142,247,.35); }
@@ -369,7 +372,7 @@ const STORAGE_KEY = 'ra_last_analysis';
 const form      = document.getElementById('analysisForm');
 const fileInput = document.getElementById('resumeFile');
 const jobInput  = document.getElementById('jobDescription');
-const submitBtn = document.getElementById('submitButton');
+const submitBtn = document.getElementById('submitButton');   // ← now exists in HTML
 const topBtn    = document.getElementById('analyzeTopBtn');
 const jdCount   = document.getElementById('jdCount');
 
@@ -378,8 +381,8 @@ window._latestResumeAnalysis = null;
 
 function revalidate(){
   const ok = fileValid && jobInput.value.trim().length > 0;
-  submitBtn.disabled = !ok;
-  if(topBtn) topBtn.disabled = !ok;
+  if (submitBtn) submitBtn.disabled = !ok;
+  if (topBtn)    topBtn.disabled    = !ok;
 }
 
 fileInput.addEventListener('change', () => attachFile(fileInput.files[0]));
@@ -610,7 +613,7 @@ function renderReport(markdown){
   });
 }
 
-/* ── Save to Saved Items (replaces Firestore save) ──────── */
+/* ── Save to Saved Items ──────────────────────────────────── */
 window.saveResumeToSaved = function(){
   const a = window._latestResumeAnalysis;
   if(!a){ toast('No analysis to save yet ⚠️'); return; }
@@ -632,7 +635,7 @@ window.saveResumeToSaved = function(){
   }
 };
 
-/* ── Session persistence ────────────────────────────────── */
+/* ── Session persistence ────────────────────────────────────── */
 function saveStateToSession(data, fileName, jobDesc){
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -698,15 +701,18 @@ function restoreStateFromSession(){
   }
 }
 
-/* ── SUBMIT ─────────────────────────────────────────────── */
+/* ── SUBMIT ─────────────────────────────────────────────────── */
 form.addEventListener('submit', function(e){
   e.preventDefault();
   if(!fileValid){ toast('Please upload a valid resume file ⚠️'); return; }
 
-  submitBtn.disabled = true;
-  if(topBtn) topBtn.disabled = true;
-  document.getElementById('btnLabel').style.display   = 'none';
-  document.getElementById('btnLoading').style.display = 'flex';
+  if(submitBtn){ submitBtn.disabled = true; }
+  if(topBtn)    topBtn.disabled = true;
+
+  const btnLabel   = document.getElementById('btnLabel');
+  const btnLoading = document.getElementById('btnLoading');
+  if(btnLabel)   btnLabel.style.display   = 'none';
+  if(btnLoading) btnLoading.style.display = 'flex';
 
   const sb = document.getElementById('saveAnalysisBtn');
   if(sb){ sb.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 🔖 Save Analysis to Saved Items'; sb.disabled = false; }
@@ -751,6 +757,34 @@ form.addEventListener('submit', function(e){
     hideDuplicateWarning();
 
     saveStateToSession(data, fileInput.files[0]?.name ?? 'Resume', jobInput.value.trim());
+
+    // ── Cache plain-text resume for Holistic Career Advisor prefill ──
+    // clear any previous value first (prevents stale markdown from lingering)
+    sessionStorage.removeItem('lifevault_resume_text');
+    // also clear the source flag so we don't accidentally show the badge
+    sessionStorage.removeItem('lifevault_resume_source');
+    if (data.resume?.resume_content) {
+      const _tmpDiv = document.createElement('div');
+      _tmpDiv.innerHTML = data.resume.resume_content;
+      // remove style/script blocks so their CSS/JS doesn't end up in plain text
+      _tmpDiv.querySelectorAll('style,script').forEach(el=>el.remove());
+      let _plainText = (_tmpDiv.textContent || _tmpDiv.innerText || '').trim();
+      // remove any leftover CSS rules or PHPWord header that slipped through
+      _plainText = _plainText
+          .replace(/@page\s+[^\{]+\{[^\}]*\}/gi, '')
+          .replace(/\.[a-zA-Z0-9_-]+\s*\{[^\}]*\}/g, '')
+          .replace(/PHPWord/gi, '')
+          .replace(/\r?\n{2,}/g, '\n')
+          .trim();
+      // don't cache if it looks like the AI report (begins with **Score:)
+      if (_plainText.length > 50 && !/\*\*Score:/i.test(_plainText)) {
+          sessionStorage.setItem('lifevault_resume_text', _plainText);
+          // remember that this text came from the analyzer so the HCA badge
+          // can display appropriately later
+          sessionStorage.setItem('lifevault_resume_source', 'analyzer');
+      }
+    }
+
     toast('Analysis complete! ✅');
   })
   .catch(err => {
@@ -764,14 +798,16 @@ form.addEventListener('submit', function(e){
     console.error('[ResumeAnalyzer]', err);
   })
   .finally(() => {
-    submitBtn.disabled = false;
-    if(topBtn) topBtn.disabled = false;
-    document.getElementById('btnLabel').style.display   = 'flex';
-    document.getElementById('btnLoading').style.display = 'none';
+    if(submitBtn){ submitBtn.disabled = false; }
+    if(topBtn)    topBtn.disabled = false;
+    const btnLabel   = document.getElementById('btnLabel');
+    const btnLoading = document.getElementById('btnLoading');
+    if(btnLabel)   btnLabel.style.display   = 'flex';
+    if(btnLoading) btnLoading.style.display = 'none';
   });
 });
 
-/* ── Download DOCX ──────────────────────────────────────── */
+/* ── Download DOCX ──────────────────────────────────────────── */
 document.addEventListener('click', function(e){
   const btn = e.target.closest('#downloadDocx');
   if(!btn) return;

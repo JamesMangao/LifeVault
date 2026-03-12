@@ -85,12 +85,8 @@ window.addEventListener('load', () => {
     document.getElementById('loading').classList.add('hidden');
     onAuthStateChanged(auth, async user => {
       if (user) {
-        // ── Grace-period deletion check ────────────────────────
-        // Run before showing the app so we can either restore the
-        // account (user came back in time) or finish deleting it.
         const proceed = await _deletionGuard.checkOnLogin(user);
-        if (!proceed) return; // account was past 30 days → wiped, sign-out handled inside
-
+        if (!proceed) return;
         currentUser = user;
         window.currentUser = user;
         showApp(user);
@@ -111,83 +107,88 @@ function showAuth() {
   document.getElementById('app').style.display = 'none';
 }
 
-// Global theme system
+/* ══ SKELETON / OPTIMISTIC UI HELPERS ═══════════════════════════
+   - .skeleton CSS classes provide animated placeholders (added in app.css)
+   - use showSkeleton(container,count,template) to render placeholder items
+   - optimisticAction(fn,renderRevert) wraps async calls for immediate UI updates
+   - progressIllusion(element,start,finish) animates a fake progress bar
+*/
+
+window.showSkeleton = function(container, count = 1, template=null) {
+  if (!container) return;
+  const tpl = template || '<div class="skeleton-text"></div>';
+  container.innerHTML = Array(count).fill(tpl).join('');
+};
+
+window.hideSkeleton = function(container) {
+  if (!container) return;
+  container.innerHTML = '';
+};
+
+/**
+ * Call an async function while applying an optimistic UI change immediately.
+ * @param {Function} fn - async function returning a promise
+ * @param {Function} apply - invoked before fn to mutate UI optimistically
+ * @param {Function} revert - invoked if fn rejects to roll back UI
+ */
+window.optimisticUpdate = async function(fn, apply, revert) {
+  try {
+    if (apply) apply();
+    const result = await fn();
+    return result;
+  } catch (err) {
+    if (revert) revert(err);
+    throw err;
+  }
+};
+
+// simple progress illusion helper; call start() to add running class,
+// and finish() when operation completes.
+window.progressIllusion = function(el) {
+  return {
+    start() { el.classList.add('running'); },
+    finish() { el.classList.remove('running'); }
+  };
+};
+
+
 window.applyTheme = function(theme) {
   const root = document.documentElement;
   const themes = {
     dark: {
-      bg: '#0b0f1a',
-      surface: '#111827',
-      surface2: '#1a2235',
-      border: 'rgba(255,255,255,0.07)',
-      text: '#e8eaf0',
-      muted: '#6b7a99',
-      accent: '#4f8ef7',
-      green: '#34d399',
-      amber: '#fbbf24',
-      rose: '#f87171',
-      lavender: '#a78bfa',
-      teal: '#2dd4bf',
-      glow: '0 0 40px rgba(79,142,247,0.15)'
+      bg: '#0b0f1a', surface: '#111827', surface2: '#1a2235',
+      border: 'rgba(255,255,255,0.07)', text: '#e8eaf0', muted: '#6b7a99',
+      accent: '#4f8ef7', green: '#34d399', amber: '#fbbf24', rose: '#f87171',
+      lavender: '#a78bfa', teal: '#2dd4bf', glow: '0 0 40px rgba(79,142,247,0.15)'
     },
     midnight: {
-      bg: '#0f0c29',
-      surface: '#1a1640',
-      surface2: '#252050',
-      border: 'rgba(255,255,255,0.08)',
-      text: '#e8eaf0',
-      muted: '#7a6fa8',
-      accent: '#6366f1',
-      green: '#34d399',
-      amber: '#fbbf24',
-      rose: '#f87171',
-      lavender: '#a78bfa',
-      teal: '#2dd4bf',
-      glow: '0 0 40px rgba(99,102,241,0.15)'
+      bg: '#0f0c29', surface: '#1a1640', surface2: '#252050',
+      border: 'rgba(255,255,255,0.08)', text: '#e8eaf0', muted: '#7a6fa8',
+      accent: '#6366f1', green: '#34d399', amber: '#fbbf24', rose: '#f87171',
+      lavender: '#a78bfa', teal: '#2dd4bf', glow: '0 0 40px rgba(99,102,241,0.15)'
     },
     forest: {
-      bg: '#071a0e',
-      surface: '#0d2e18',
-      surface2: '#1a3d26',
-      border: 'rgba(255,255,255,0.08)',
-      text: '#e8eaf0',
-      muted: '#6b8a6f',
-      accent: '#22c55e',
-      green: '#34d399',
-      amber: '#fbbf24',
-      rose: '#f87171',
-      lavender: '#a78bfa',
-      teal: '#2dd4bf',
-      glow: '0 0 40px rgba(34,197,94,0.15)'
+      bg: '#071a0e', surface: '#0d2e18', surface2: '#1a3d26',
+      border: 'rgba(255,255,255,0.08)', text: '#e8eaf0', muted: '#6b8a6f',
+      accent: '#22c55e', green: '#34d399', amber: '#fbbf24', rose: '#f87171',
+      lavender: '#a78bfa', teal: '#2dd4bf', glow: '0 0 40px rgba(34,197,94,0.15)'
     },
     rose: {
-      bg: '#1a0a0a',
-      surface: '#2d1212',
-      surface2: '#3d1a1a',
-      border: 'rgba(255,255,255,0.08)',
-      text: '#e8eaf0',
-      muted: '#8a6b6b',
-      accent: '#f87171',
-      green: '#34d399',
-      amber: '#fbbf24',
-      rose: '#f87171',
-      lavender: '#a78bfa',
-      teal: '#2dd4bf',
-      glow: '0 0 40px rgba(248,113,113,0.15)'
+      bg: '#1a0a0a', surface: '#2d1212', surface2: '#3d1a1a',
+      border: 'rgba(255,255,255,0.08)', text: '#e8eaf0', muted: '#8a6b6b',
+      accent: '#f87171', green: '#34d399', amber: '#fbbf24', rose: '#f87171',
+      lavender: '#a78bfa', teal: '#2dd4bf', glow: '0 0 40px rgba(248,113,113,0.15)'
     }
   };
-
   const selectedTheme = themes[theme] || themes.dark;
   Object.keys(selectedTheme).forEach(key => {
     root.style.setProperty(`--${key}`, selectedTheme[key]);
   });
 };
 
-// Load user's saved theme preference
 async function loadUserTheme(userId) {
   try {
-    const { getDoc, doc } = window._fbFS;
-    const snap = await getDoc(doc(window.db, 'settings', userId));
+    const snap = await getDoc(doc(db, 'settings', userId));
     if (snap.exists()) {
       const settings = snap.data();
       const theme = settings.appearance?.theme || 'dark';
@@ -207,13 +208,11 @@ function showApp(user) {
   document.getElementById('user-avatar').src = av;
   document.getElementById('composer-avatar').src = av;
   updateGreeting();
-  // Show welcome-back banner if deletion was auto-cancelled on this login
   _maybeShowWelcomeBackBanner();
-  // Show persistent deletion-pending banner if account is still in queue
   _checkAndShowDeletionBanner(user.uid);
   ensureUserProfileExists(user);
   loadUserProfile();
-  loadUserTheme(user.uid); // Load and apply user's saved theme
+  loadUserTheme(user.uid);
   restoreLastPage();
 }
 
@@ -253,6 +252,13 @@ window.signOutUser = async () => {
 async function loadAll() {
   if (!currentUser) return;
   const uid = currentUser.uid;
+
+  // show skeleton placeholders for lists while we fetch
+  ['journal-list','tasks-high','tasks-med','tasks-low','goals-list'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) showSkeleton(el, 3, '<div class="skeleton-text" style="height:32px;margin:6px 0"></div>');
+  });
+
   try {
     const [j,t,g] = await Promise.all([
       getDocs(query(collection(db,'users',uid,'journals'), orderBy('createdAt','desc'))),
@@ -274,9 +280,16 @@ async function loadAll() {
 
 function updateGreeting() {
   const h = new Date().getHours();
-  document.getElementById('greeting-time').textContent = h<12?'morning':h<17?'afternoon':'evening';
-  document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  document.getElementById('daily-motivation').textContent = MOTIVATIONS[Math.floor(Math.random()*MOTIVATIONS.length)];
+  const gEl = document.getElementById('greeting-time');
+  if (gEl) {
+    gEl.textContent = h<12?'morning':h<18?'afternoon':'evening';
+    // if CSS is stale/hasn't reloaded, force the theme colour anyway
+    gEl.style.color = 'var(--text)';
+  }
+  const dateEl = document.getElementById('today-date');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const motEl = document.getElementById('daily-motivation');
+  if (motEl) motEl.textContent = MOTIVATIONS[Math.floor(Math.random()*MOTIVATIONS.length)];
 }
 
 /* ══ NAVIGATION ══════════════════════════════════════════════ */
@@ -284,8 +297,19 @@ window.navigateTo = (page, event) => {
   if (event) event.stopPropagation();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+
+  const pageEl = document.getElementById('page-'+page);
+  if (pageEl) {
+    pageEl.classList.add('active');
+  } else {
+    console.warn('navigateTo: no page element for', page);
+  }
+
+  const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navEl) {
+    navEl.classList.add('active');
+  }
+
   localStorage.setItem('lifeVaultLastPage', page);
   closeSidebar();
   if (page === 'insights')   renderInsights();
@@ -301,7 +325,7 @@ function restoreLastPage() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SETTINGS MODULE  —  self-contained, no stubs
+   SETTINGS MODULE
 ══════════════════════════════════════════════════════════════ */
 const _settingsModule = (() => {
   let _listenersAttached = false;
@@ -310,7 +334,6 @@ const _settingsModule = (() => {
   function _showBar() { document.getElementById('settings-save-bar')?.classList.add('visible'); }
   function _hideBar() { document.getElementById('settings-save-bar')?.classList.remove('visible'); }
 
-  // Clone-replace trick: sets .checked with zero chance of firing a change event
   function _setToggle(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -320,7 +343,6 @@ const _settingsModule = (() => {
   }
 
   function _attachListeners() {
-    // After _setToggle the originals are replaced — always re-query fresh nodes
     _listenersAttached = false;
     if (_listenersAttached) return;
     _listenersAttached = true;
@@ -332,9 +354,7 @@ const _settingsModule = (() => {
   async function load() {
     const user = auth?.currentUser;
     if (!user) return;
-
-    _acceptingChanges = false; // block the gate while we populate
-
+    _acceptingChanges = false;
     try {
       const snap = await getDoc(doc(db, 'settings', user.uid));
       if (snap.exists()) {
@@ -352,9 +372,6 @@ const _settingsModule = (() => {
     } catch(e) {
       console.warn('Settings load error:', e.message);
     }
-
-    // Re-attach on the freshly cloned nodes, then open the gate after two
-    // animation frames so any browser-queued microtasks have fully flushed
     _attachListeners();
     requestAnimationFrame(() => requestAnimationFrame(() => {
       _acceptingChanges = true;
@@ -365,7 +382,6 @@ const _settingsModule = (() => {
   async function save() {
     const user = auth?.currentUser;
     if (!user) { toast('You must be logged in.', '⚠️'); return false; }
-
     const data = {
       notifications: {
         journal:   document.getElementById('notif-journal')?.checked   ?? true,
@@ -377,9 +393,6 @@ const _settingsModule = (() => {
         community: document.getElementById('privacy-community')?.checked ?? true,
       }
     };
-
-    // Also sync the privacy flags to the user's profile document so that
-    // community / profile pages respect the setting immediately
     try {
       await Promise.all([
         setDoc(doc(db, 'settings', user.uid), data, { merge: true }),
@@ -388,7 +401,6 @@ const _settingsModule = (() => {
           showInCommunity: data.privacy.community,
         })
       ]);
-      // Update in-memory profile too so renderProfilePage() is instant
       if (userProfile) {
         userProfile.isPublic = data.privacy.public;
         userProfile.showInCommunity = data.privacy.community;
@@ -405,17 +417,14 @@ const _settingsModule = (() => {
   return { load, save, hideBar: _hideBar };
 })();
 
-// Public handles called from HTML onclick attributes
 window.handleSave = async () => {
   const ok = await _settingsModule.save();
   if (ok) _settingsModule.hideBar();
 };
-
-// Called by navigateTo — this is the ONLY definition of renderSettingsPage
 window.renderSettingsPage = () => _settingsModule.load();
 
 /* ══════════════════════════════════════════════════════════════
-   EXPORT  —  full Firestore export (replaces old exportAsJSON stub)
+   EXPORT
 ══════════════════════════════════════════════════════════════ */
 window.exportUserData = async () => {
   const user = auth?.currentUser;
@@ -454,31 +463,14 @@ window.exportUserData = async () => {
     toast('Export failed. See console.', '🔥');
   }
 };
-
-// Legacy alias used by the backup button elsewhere in the app
 window.exportAsJSON = window.exportUserData;
 
 /* ══════════════════════════════════════════════════════════════
-   ACCOUNT DELETION  —  30-day grace period system
-   ─────────────────────────────────────────────────────────────
-   Flow:
-   1. User requests deletion => we write deletionScheduledAt to
-      Firestore and sign them out. Data stays untouched.
-   2. On every subsequent login => checkOnLogin() runs:
-      a. No deletion flag  => normal login, show app.
-      b. Flag exists, < 30 days => cancel flag (user came back),
-         show "Welcome back" banner, continue to app.
-      c. Flag exists, >= 30 days => wipe all data, delete Auth
-         account, show auth screen.
-   3. User can also cancel from the Settings page while still
-      logged in via cancelAccountDeletion().
+   ACCOUNT DELETION — 30-day grace period
 ══════════════════════════════════════════════════════════════ */
-
 const DELETION_GRACE_DAYS = 30;
 
 const _deletionGuard = (() => {
-
-  // ── Internal: permanently wipe everything ─────────────────
   async function _hardDelete(user) {
     const uid = user.uid;
     try {
@@ -498,71 +490,41 @@ const _deletionGuard = (() => {
       await user.delete();
     } catch(e) {
       console.error('Hard delete error:', e);
-      if (e.code === 'auth/requires-recent-login') {
-        // Can't delete auth account without recent sign-in.
-        // Data is already wiped from Firestore; just sign out.
-        await fbSignOut(auth);
-      }
+      if (e.code === 'auth/requires-recent-login') await fbSignOut(auth);
     }
   }
 
-  // ── Called on every login ──────────────────────────────────
-  // Returns true  → allow app to load normally
-  // Returns false → account deleted or being signed out
   async function checkOnLogin(user) {
     try {
       const snap = await getDoc(doc(db, 'deletion_queue', user.uid));
-      if (!snap.exists()) return true; // no deletion pending — all good
-
+      if (!snap.exists()) return true;
       const { scheduledAt } = snap.data();
       const scheduledDate   = scheduledAt?.toDate ? scheduledAt.toDate() : new Date(scheduledAt);
       const msElapsed       = Date.now() - scheduledDate.getTime();
       const daysElapsed     = msElapsed / (1000 * 60 * 60 * 24);
-
       if (daysElapsed >= DELETION_GRACE_DAYS) {
-        // Grace period expired — permanently delete and boot
         await _hardDelete(user);
         showAuth();
         _showExpiredBanner();
         return false;
       }
-
-      // User came back within the grace period — cancel deletion
       await deleteDoc(doc(db, 'deletion_queue', user.uid));
-      // Clear the pending flag from users doc too (in case it was set)
       await updateDoc(doc(db, 'users', user.uid), {
         deletionScheduledAt: null,
         deletionPending: false
-      }).catch(() => {}); // ignore if field didn't exist
-
-      // Will show the "welcome back" banner after app loads
+      }).catch(() => {});
       window._showDeletionCancelledBanner = true;
       return true;
-
     } catch(e) {
       console.error('Deletion check error:', e);
-      return true; // on error, let the user in (safe fallback)
+      return true;
     }
   }
 
-  // ── Show a temporary full-screen notice after hard delete ──
   function _showExpiredBanner() {
     const el = document.createElement('div');
-    el.style.cssText = `
-      position:fixed;inset:0;background:var(--bg,#0d1117);display:flex;
-      flex-direction:column;align-items:center;justify-content:center;
-      z-index:99999;padding:32px;text-align:center;
-    `;
-    el.innerHTML = `
-      <div style="font-size:3rem;margin-bottom:16px">🗑️</div>
-      <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:10px;color:#e8eaf0">
-        Account Permanently Deleted
-      </div>
-      <div style="font-family:'Newsreader',serif;font-size:.95rem;color:#6b7280;max-width:380px;line-height:1.7">
-        Your 30-day grace period expired and your account has been permanently removed.
-        All data has been wiped. Thank you for using LifeVault.
-      </div>
-    `;
+    el.style.cssText = `position:fixed;inset:0;background:var(--bg,#0d1117);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;padding:32px;text-align:center;`;
+    el.innerHTML = `<div style="font-size:3rem;margin-bottom:16px">🗑️</div><div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:10px;color:#e8eaf0">Account Permanently Deleted</div><div style="font-family:'Newsreader',serif;font-size:.95rem;color:#6b7280;max-width:380px;line-height:1.7">Your 30-day grace period expired and your account has been permanently removed.</div>`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 6000);
   }
@@ -570,55 +532,37 @@ const _deletionGuard = (() => {
   return { checkOnLogin };
 })();
 
-/* ── Schedule deletion (replaces instant hard-delete) ────── */
 window.confirmDeleteAccount = async () => {
   const user = auth?.currentUser;
   if (!user) return;
-
-  // Custom confirmation modal UI
   const confirmed = await _showDeleteConfirmModal();
   if (!confirmed) return;
-
   try {
     const scheduledAt = Timestamp.now();
     const deleteDate  = new Date(Date.now() + DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000);
-
-    // Write to deletion_queue — this is the only thing that happens now
     await setDoc(doc(db, 'deletion_queue', user.uid), {
-      uid:         user.uid,
-      email:       user.email,
-      displayName: user.displayName || '',
-      scheduledAt,
-      deleteAfter: Timestamp.fromDate(deleteDate),
+      uid: user.uid, email: user.email, displayName: user.displayName || '',
+      scheduledAt, deleteAfter: Timestamp.fromDate(deleteDate),
     });
-
-    // Also flag on the user doc so other parts of the app can read it
     await updateDoc(doc(db, 'users', user.uid), {
-      deletionPending:    true,
-      deletionScheduledAt: scheduledAt,
+      deletionPending: true, deletionScheduledAt: scheduledAt,
     }).catch(() => {});
-
     toast('Account scheduled for deletion. You have 30 days to change your mind.', '🗑️');
-
-    // Sign out so the user sees the effect
     if (feedUnsubscribe) feedUnsubscribe();
     await fbSignOut(auth);
-
   } catch(e) {
     console.error(e);
     toast('Error scheduling deletion: ' + e.message, '🔥');
   }
 };
 
-/* ── Cancel deletion (callable from Settings page) ────────── */
 window.cancelAccountDeletion = async () => {
   const user = auth?.currentUser;
   if (!user) return;
   try {
     await deleteDoc(doc(db, 'deletion_queue', user.uid));
     await updateDoc(doc(db, 'users', user.uid), {
-      deletionPending:     false,
-      deletionScheduledAt: null,
+      deletionPending: false, deletionScheduledAt: null,
     }).catch(() => {});
     _hideDeletionBanner();
     toast('Account deletion cancelled. Welcome back! 🎉', '✅');
@@ -627,41 +571,15 @@ window.cancelAccountDeletion = async () => {
   }
 };
 
-/* ── Deletion status banner (shown inside the app) ─────────── */
 function _showDeletionBanner(daysLeft) {
-  // Remove any existing banner first
   document.getElementById('deletion-banner')?.remove();
-
   const banner = document.createElement('div');
   banner.id = 'deletion-banner';
-  banner.style.cssText = `
-    position:fixed;top:0;left:0;right:0;z-index:9000;
-    background:linear-gradient(90deg,rgba(239,68,68,.15),rgba(239,68,68,.08));
-    border-bottom:1px solid rgba(239,68,68,.35);
-    padding:10px 20px;display:flex;align-items:center;justify-content:center;
-    gap:12px;flex-wrap:wrap;backdrop-filter:blur(8px);
-  `;
-  banner.innerHTML = `
-    <span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#fca5a5;font-weight:600">
-      🗑️ Your account is scheduled for deletion in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong>.
-      Sign back in before that to keep your account.
-    </span>
-    <button onclick="cancelAccountDeletion()" style="
-      background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);
-      color:#fca5a5;font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;
-      padding:5px 14px;border-radius:8px;cursor:pointer;transition:background .2s;
-      white-space:nowrap;
-    " onmouseover="this.style.background='rgba(239,68,68,.35)'"
-       onmouseout="this.style.background='rgba(239,68,68,.2)'">
-      Cancel Deletion
-    </button>
-  `;
+  banner.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(90deg,rgba(239,68,68,.15),rgba(239,68,68,.08));border-bottom:1px solid rgba(239,68,68,.35);padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;backdrop-filter:blur(8px);`;
+  banner.innerHTML = `<span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#fca5a5;font-weight:600">🗑️ Your account is scheduled for deletion in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong>.</span><button onclick="cancelAccountDeletion()" style="background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);color:#fca5a5;font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;padding:5px 14px;border-radius:8px;cursor:pointer;">Cancel Deletion</button>`;
   document.body.prepend(banner);
-
-  // Push app content down so the banner doesn't overlap
   const appEl = document.getElementById('app');
-  if (appEl) appEl.style.paddingTop = (appEl.style.paddingTop || '0px') === '0px'
-    ? (banner.offsetHeight + 'px') : appEl.style.paddingTop;
+  if (appEl) appEl.style.paddingTop = (appEl.style.paddingTop || '0px') === '0px' ? (banner.offsetHeight + 'px') : appEl.style.paddingTop;
 }
 
 function _hideDeletionBanner() {
@@ -673,7 +591,6 @@ function _hideDeletionBanner() {
   }
 }
 
-/* ── Show banner if deletion is pending for logged-in user ── */
 async function _checkAndShowDeletionBanner(uid) {
   try {
     const snap = await getDoc(doc(db, 'deletion_queue', uid));
@@ -686,92 +603,24 @@ async function _checkAndShowDeletionBanner(uid) {
   } catch(e) { /* silent */ }
 }
 
-/* ── "Welcome back" banner after auto-cancel ──────────────── */
 function _maybeShowWelcomeBackBanner() {
   if (!window._showDeletionCancelledBanner) return;
   window._showDeletionCancelledBanner = false;
   const banner = document.createElement('div');
-  banner.style.cssText = `
-    position:fixed;top:0;left:0;right:0;z-index:9000;
-    background:linear-gradient(90deg,rgba(52,211,153,.15),rgba(52,211,153,.08));
-    border-bottom:1px solid rgba(52,211,153,.35);
-    padding:12px 20px;display:flex;align-items:center;justify-content:center;
-    gap:10px;backdrop-filter:blur(8px);
-  `;
-  banner.innerHTML = `
-    <span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#6ee7b7;font-weight:600">
-      🎉 Welcome back! Your account deletion has been automatically cancelled.
-    </span>
-    <button onclick="this.parentElement.remove()" style="
-      background:none;border:none;color:#6ee7b7;cursor:pointer;font-size:1.1rem;padding:0 4px;
-    ">×</button>
-  `;
+  banner.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9000;background:linear-gradient(90deg,rgba(52,211,153,.15),rgba(52,211,153,.08));border-bottom:1px solid rgba(52,211,153,.35);padding:12px 20px;display:flex;align-items:center;justify-content:center;gap:10px;backdrop-filter:blur(8px);`;
+  banner.innerHTML = `<span style="font-size:.85rem;font-family:'Syne',sans-serif;color:#6ee7b7;font-weight:600">🎉 Welcome back! Your account deletion has been automatically cancelled.</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#6ee7b7;cursor:pointer;font-size:1.1rem;padding:0 4px;">×</button>`;
   document.body.prepend(banner);
   setTimeout(() => banner.remove(), 8000);
 }
 
-/* ── Custom delete confirmation modal ────────────────────── */
 function _showDeleteConfirmModal() {
   return new Promise(resolve => {
-    // Remove any stale instance
     document.getElementById('delete-confirm-modal')?.remove();
-
     const overlay = document.createElement('div');
     overlay.id = 'delete-confirm-modal';
-    overlay.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;
-      display:flex;align-items:center;justify-content:center;padding:24px;
-      backdrop-filter:blur(4px);
-    `;
-    overlay.innerHTML = `
-      <div style="
-        background:var(--surface,#161b22);border:1px solid rgba(239,68,68,.4);
-        border-radius:20px;padding:32px;max-width:440px;width:100%;
-        box-shadow:0 24px 64px rgba(0,0,0,.6);
-      ">
-        <div style="font-size:2.5rem;text-align:center;margin-bottom:16px">⚠️</div>
-        <div style="font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;
-                    text-align:center;margin-bottom:10px;color:#e8eaf0">
-          Delete Account?
-        </div>
-        <div style="font-family:'Newsreader',serif;font-size:.9rem;color:#9ca3af;
-                    text-align:center;line-height:1.7;margin-bottom:8px">
-          Your account will be <strong style="color:#fca5a5">scheduled for deletion</strong>.
-          You have <strong style="color:#fbbf24">30 days</strong> to log back in and cancel.
-        </div>
-        <div style="
-          background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);
-          border-radius:10px;padding:12px 16px;margin-bottom:24px;
-          font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#fcd34d;
-          line-height:1.6;
-        ">
-          ✦ All your journals, tasks, and goals will be preserved during the 30-day window.<br>
-          ✦ Simply sign back in at any time to cancel.<br>
-          ✦ After 30 days, all data is permanently and irreversibly deleted.
-        </div>
-        <div style="display:flex;gap:10px;">
-          <button id="del-cancel-btn" style="
-            flex:1;padding:12px;border-radius:10px;border:1px solid var(--border,#30363d);
-            background:transparent;color:#9ca3af;font-family:'Syne',sans-serif;
-            font-size:.85rem;font-weight:600;cursor:pointer;transition:background .2s;
-          " onmouseover="this.style.background='rgba(255,255,255,.05)'"
-             onmouseout="this.style.background='transparent'">
-            Keep My Account
-          </button>
-          <button id="del-confirm-btn" style="
-            flex:1;padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,.5);
-            background:rgba(239,68,68,.15);color:#fca5a5;font-family:'Syne',sans-serif;
-            font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s;
-          " onmouseover="this.style.background='rgba(239,68,68,.3)'"
-             onmouseout="this.style.background='rgba(239,68,68,.15)'">
-            Schedule Deletion
-          </button>
-        </div>
-      </div>
-    `;
-
+    overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px);`;
+    overlay.innerHTML = `<div style="background:var(--surface,#161b22);border:1px solid rgba(239,68,68,.4);border-radius:20px;padding:32px;max-width:440px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.6);"><div style="font-size:2.5rem;text-align:center;margin-bottom:16px">⚠️</div><div style="font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:800;text-align:center;margin-bottom:10px;color:#e8eaf0">Delete Account?</div><div style="font-family:'Newsreader',serif;font-size:.9rem;color:#9ca3af;text-align:center;line-height:1.7;margin-bottom:8px">Your account will be <strong style="color:#fca5a5">scheduled for deletion</strong>. You have <strong style="color:#fbbf24">30 days</strong> to log back in and cancel.</div><div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 16px;margin-bottom:24px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#fcd34d;line-height:1.6;">✦ All your data is preserved during the 30-day window.<br>✦ Simply sign back in at any time to cancel.<br>✦ After 30 days, all data is permanently deleted.</div><div style="display:flex;gap:10px;"><button id="del-cancel-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border,#30363d);background:transparent;color:#9ca3af;font-family:'Syne',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;">Keep My Account</button><button id="del-confirm-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.15);color:#fca5a5;font-family:'Syne',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;">Schedule Deletion</button></div></div>`;
     document.body.appendChild(overlay);
-
     document.getElementById('del-cancel-btn').onclick  = () => { overlay.remove(); resolve(false); };
     document.getElementById('del-confirm-btn').onclick = () => { overlay.remove(); resolve(true);  };
     overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
@@ -780,57 +629,95 @@ function _showDeleteConfirmModal() {
 
 /* ══════════════════════════════════════════════════════════════
    JOURNAL EXPAND
+   ── Updated to use #jx-overlay and #jx-* element IDs
+   ── Matches journal-expand-overlay-FINAL.blade.php
 ══════════════════════════════════════════════════════════════ */
 window.openExpandedJournal = id => {
   const e = journals.find(j => j.id === id);
   if (!e) return;
   expandedJournalId = id;
-  document.getElementById('exp-title').textContent   = e.title || 'Untitled';
-  document.getElementById('exp-mood').textContent    = e.moodEmoji || '😐';
-  document.getElementById('exp-date').textContent    = fmtDate(e.createdAt);
-  document.getElementById('exp-content').textContent = e.content || '';
 
-  const photosEl = document.getElementById('exp-photos');
+  // ── populate new jx-* elements ──────────────────────────────
+  document.getElementById('jx-title').textContent   = e.title || 'Untitled';
+  document.getElementById('jx-date').textContent    = fmtDate(e.createdAt);
+  document.getElementById('jx-content').textContent = e.content || '';
+
+  const moodEl = document.getElementById('jx-mood');
+  if (e.moodEmoji) {
+    moodEl.textContent   = e.moodEmoji;
+    moodEl.style.display = 'inline-flex';
+  } else {
+    moodEl.textContent   = '';
+    moodEl.style.display = 'none';
+  }
+
+  // word count
+  const wcEl = document.getElementById('jx-wc');
+  if (wcEl) {
+    const n = (e.content || '').trim().split(/\s+/).filter(Boolean).length;
+    wcEl.textContent = n + (n === 1 ? ' word' : ' words');
+  }
+
+  // photos
+  const photosEl = document.getElementById('jx-photos');
   if (e.photoUrls?.length) {
-    photosEl.style.display = 'flex';
+    photosEl.style.display = 'grid';
     photosEl.innerHTML = e.photoUrls.map(u =>
-      `<img src="${u}" class="expanded-photo" onclick="viewPhoto('${u}')">`
+      `<img src="${esc(u)}" loading="lazy" onclick="viewPhoto('${esc(u)}')" alt="Journal photo">`
     ).join('');
-  } else { photosEl.style.display = 'none'; photosEl.innerHTML = ''; }
+  } else {
+    photosEl.style.display = 'none';
+    photosEl.innerHTML = '';
+  }
 
-  const tagsEl = document.getElementById('exp-tags');
+  // tags
+  const tagsEl = document.getElementById('jx-tags');
   if (e.tags?.length) {
     tagsEl.style.display = 'flex';
     tagsEl.innerHTML = e.tags.map(t =>
-      `<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`
+      `<span>${esc(t)}</span>`
     ).join('');
-  } else { tagsEl.style.display = 'none'; tagsEl.innerHTML = ''; }
+  } else {
+    tagsEl.style.display = 'none';
+    tagsEl.innerHTML = '';
+  }
 
-  document.getElementById('journal-expand-overlay').classList.add('open');
+  // buttons
+  const editBtn = document.getElementById('jx-edit-btn');
+  if (editBtn) editBtn.onclick = () => { closeJournalExpand(); openJournalModal(id); };
+
+  const delBtn = document.getElementById('jx-del-btn');
+  if (delBtn) delBtn.onclick = () => { closeJournalExpand(); delJournal(id); };
+
+  // open overlay
+  document.getElementById('jx-overlay').classList.add('jx-open');
   document.body.style.overflow = 'hidden';
+  const body = document.getElementById('jx-body');
+  if (body) body.scrollTop = 0;
 };
 
-window.closeExpandedJournal = () => {
-  document.getElementById('journal-expand-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-  expandedJournalId = null;
+window.closeJournalExpand = () => {
+  const overlay = document.getElementById('jx-overlay');
+  if (!overlay || !overlay.classList.contains('jx-open')) return;
+  overlay.style.opacity    = '0';
+  overlay.style.transition = 'opacity .17s ease';
+  setTimeout(() => {
+    overlay.classList.remove('jx-open');
+    overlay.style.opacity    = '';
+    overlay.style.transition = '';
+    document.body.style.overflow = '';
+    expandedJournalId = null;
+  }, 170);
 };
+// aliases — keep any existing callers working
+window.closeExpandedJournal = window.closeJournalExpand;
+window.openJournalExpand    = window.openExpandedJournal;
 
-window.editFromExpanded = () => {
-  const id = expandedJournalId;
-  closeExpandedJournal();
-  openJournalModal(id);
-};
-
-window.shareJournalFromExpanded = () => {
-  if (expandedJournalId) { closeExpandedJournal(); setTimeout(() => shareJournal(expandedJournalId), 100); }
-};
-
-document.getElementById('journal-expand-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('journal-expand-overlay')) closeExpandedJournal();
-});
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && expandedJournalId) closeExpandedJournal();
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('jx-overlay');
+    if (overlay?.classList.contains('jx-open')) window.closeJournalExpand();
+  }
 });
 
 /* ══ DELEGATED LISTENERS ═════════════════════════════════════ */
@@ -858,15 +745,21 @@ function initExpandableCards(container) {
     const entryEl = e.target.closest('.journal-entry, .post-card');
     if (entryEl) {
       if (entryEl.classList.contains('journal-entry')) {
+        const jid = entryEl.dataset.id || entryEl.dataset.journalId;
+        if (jid) { window.openExpandedJournal(jid); return; }
+        // fallback: toggle preview expansion
         const preview = entryEl.querySelector('.entry-preview');
         if (preview) preview.classList.toggle('expanded');
       } else if (entryEl.classList.contains('post-card')) {
         const postId = entryEl.getAttribute('data-expand') || entryEl.getAttribute('data-post-id');
         if (postId) {
-          if (typeof window._profileOpenExpandedPost === 'function') {
-            window._profileOpenExpandedPost(postId);
-          } else if (typeof window.openExpandedPost === 'function') {
-            window.openExpandedPost(postId);
+          // if the post itself is a shared journal entry, open the journal overlay
+          const postObj = window.feedPosts?.find(p=>p.id===postId);
+          if (postObj && postObj.type==='journal' && typeof window.openExpandedJournal === 'function') {
+            window.openExpandedJournal(postId);
+          } else {
+            if (typeof window._profileOpenExpandedPost === 'function') window._profileOpenExpandedPost(postId);
+            else if (typeof window.openExpandedPost === 'function') window.openExpandedPost(postId);
           }
         }
       }
@@ -881,19 +774,13 @@ function renderJournals(containerId, maxCount, isDash) {
   const list = maxCount ? journals.slice(0, maxCount) : journals;
 
   if (!list.length) {
-    container.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">📖</div>
-      <div class="empty-text">No entries yet.</div>
-      <button class="btn btn-primary" onclick="openJournalModal()">Write first entry</button>
-    </div>`;
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📖</div><div class="empty-text">No entries yet.</div><button class="btn btn-primary" onclick="openJournalModal()">Write first entry</button></div>`;
     return;
   }
 
   container.innerHTML = list.map(e => {
     const photosHtml = e.photoUrls?.length
-      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-          ${e.photoUrls.map(u => `<img src="${u}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)" data-photo="${u}">`).join('')}
-        </div>` : '';
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${e.photoUrls.map(u => `<img src="${u}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)" data-photo="${u}">`).join('')}</div>` : '';
     const tagsHtml = e.tags?.length
       ? `<div class="entry-tags">${e.tags.map(t => `<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`
       : '';
@@ -906,7 +793,7 @@ function renderJournals(containerId, maxCount, isDash) {
            <button class="del-btn" data-del="${e.id}" title="Delete">✕</button>
          </div>`;
 
-    return `<div class="journal-entry" data-expand="${e.id}">
+    return `<div class="journal-entry" data-id="${e.id}">
       <div class="entry-header">
         <div>
           <div style="font-size:.85rem;font-weight:600;margin-bottom:2px">${esc(e.title || 'Untitled')}</div>
@@ -1018,34 +905,66 @@ window.saveJournalEntry = async () => {
     tags: document.getElementById('journal-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
     photoUrls
   };
+  const btn = document.querySelector('#journal-modal .progress-illusion');
+  const bar = btn ? progressIllusion(btn) : null;
+  if (bar) bar.start();
   try {
     if (editJournalId) {
-      await updateDoc(doc(db,'users',currentUser.uid,'journals',editJournalId), data);
+      // optimistic update: keep copy and apply change immediately
+      const old = journals.find(j=>j.id===editJournalId);
+      await optimisticUpdate(async () => {
+        await updateDoc(doc(db,'users',currentUser.uid,'journals',editJournalId), data);
+      },
+      () => {
+        if (old) {
+          const i = journals.findIndex(j => j.id === editJournalId);
+          if (i !== -1) journals[i] = old;
+        }
+      });
       const i = journals.findIndex(j => j.id === editJournalId);
       if (i !== -1) journals[i] = {...journals[i],...data};
       toast('Entry updated!','📓');
     } else {
       data.createdAt = Timestamp.now();
-      const r = await addDoc(collection(db,'users',currentUser.uid,'journals'), data);
-      journals.unshift({id:r.id,...data, createdAt:new Date()});
+      // optimistic insert
+      const fake = {id:'_optimistic',...data, createdAt:new Date()};
+      journals.unshift(fake);
+      await optimisticUpdate(async () => {
+        const r = await addDoc(collection(db,'users',currentUser.uid,'journals'), data);
+        // replace fake with real id
+        const idx = journals.findIndex(j=>j.id==='_optimistic');
+        if (idx !== -1) journals[idx] = {id:r.id,...data, createdAt:new Date()};
+      },
+      () => { // revert
+        journals = journals.filter(j=>j.id!=='_optimistic');
+      });
       toast('Entry saved! ✨','📓');
     }
     closeModal('journal-modal'); renderAll(); editJournalId = null;
   } catch(e) { toast('Error: '+e.message,'❌'); }
+  finally { if (bar) bar.finish(); }
 };
 
 window.delJournal = async id => {
   if (!confirm('Delete this entry?')) return;
+  const removed = journals.find(j=>j.id===id);
   journals = journals.filter(j => j.id !== id);
-  await deleteDoc(doc(db,'users',currentUser.uid,'journals',id));
-  renderAll(); toast('Entry deleted','🗑️');
+  try {
+    await optimisticUpdate(async () => {
+      await deleteDoc(doc(db,'users',currentUser.uid,'journals',id));
+    }, null, () => {
+      if (removed) journals.unshift(removed);
+    });
+    renderAll(); toast('Entry deleted','🗑️');
+  } catch(e) {
+    toast('Error: '+e.message,'❌');
+  }
 };
 
 window.viewPhoto = url => {
   const d = document.createElement('div');
   d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.93);display:flex;align-items:center;justify-content:center;z-index:9999';
-  d.innerHTML = `<img src="${url}" style="max-width:92%;max-height:92%;border-radius:10px">
-    <button style="position:absolute;top:20px;right:24px;background:none;border:none;color:white;font-size:2.2rem;cursor:pointer" onclick="this.parentElement.remove()">×</button>`;
+  d.innerHTML = `<img src="${url}" style="max-width:92%;max-height:92%;border-radius:10px"><button style="position:absolute;top:20px;right:24px;background:none;border:none;color:white;font-size:2.2rem;cursor:pointer" onclick="this.parentElement.remove()">×</button>`;
   d.onclick = e => { if (e.target === d) d.remove(); };
   document.body.appendChild(d);
 };
@@ -1075,28 +994,52 @@ window.saveTask = async () => {
   const text = document.getElementById('task-text').value.trim();
   if (!text) { toast('Enter a task!','✏️'); return; }
   const data = { text, priority: document.getElementById('task-priority').value, note: document.getElementById('task-note').value.trim(), done: false };
+  const btn = document.querySelector('#task-modal .progress-illusion');
+  const bar = btn ? progressIllusion(btn) : null;
+  if (bar) bar.start();
   try {
     if (editTaskId) {
-      await updateDoc(doc(db,'users',currentUser.uid,'tasks',editTaskId), data);
+      const old = tasks.find(t=>t.id===editTaskId);
+      await optimisticUpdate(async () => {
+        await updateDoc(doc(db,'users',currentUser.uid,'tasks',editTaskId), data);
+      },
+      () => {
+        if (old) {
+          const i = tasks.findIndex(t => t.id === editTaskId);
+          if (i !== -1) tasks[i] = old;
+        }
+      });
       const i = tasks.findIndex(t => t.id === editTaskId);
       if (i !== -1) tasks[i] = {...tasks[i],...data};
       toast('Task updated!','✅');
     } else {
       data.createdAt = Timestamp.now();
-      const r = await addDoc(collection(db,'users',currentUser.uid,'tasks'), data);
-      tasks.unshift({id:r.id,...data, createdAt:new Date()});
+      const fakeId = '_optimistic';
+      tasks.unshift({id:fakeId,...data, createdAt:new Date()});
+      await optimisticUpdate(async () => {
+        const r = await addDoc(collection(db,'users',currentUser.uid,'tasks'), data);
+        const idx = tasks.findIndex(t=>t.id===fakeId);
+        if (idx !== -1) tasks[idx] = {id:r.id,...data, createdAt:new Date()};
+      },
+      () => { tasks = tasks.filter(t=>t.id!==fakeId); });
       toast('Task added!','✅');
     }
     closeModal('task-modal'); renderAll(); editTaskId = null;
   } catch(e) { toast('Error: '+e.message,'❌'); }
+  finally { if (bar) bar.finish(); }
 };
 
 window.toggleTask = async id => {
   const t = tasks.find(t => t.id === id); if (!t) return;
+  const oldDone = t.done;
   t.done = !t.done;
-  await updateDoc(doc(db,'users',currentUser.uid,'tasks',id), {done:t.done});
-  if (t.done) toast('Task done! 🎉','✅');
-  renderAll();
+  try {
+    await optimisticUpdate(async () => {
+      await updateDoc(doc(db,'users',currentUser.uid,'tasks',id), {done:t.done});
+    }, null, () => { t.done = oldDone; });
+    if (t.done) toast('Task done! 🎉','✅');
+    renderAll();
+  } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
 window.delTask = async id => {
@@ -1154,35 +1097,66 @@ window.saveGoal = async () => {
   const name = document.getElementById('goal-name').value.trim();
   if (!name) { toast('Name your goal!','🎯'); return; }
   const data = { name, category: document.getElementById('goal-category').value, target: document.getElementById('goal-target').value.trim() };
+  const btn = document.querySelector('#goal-modal .progress-illusion');
+  const bar = btn ? progressIllusion(btn) : null;
+  if (bar) bar.start();
   try {
     if (editGoalId) {
-      await updateDoc(doc(db,'users',currentUser.uid,'goals',editGoalId), data);
+      const old = goals.find(g=>g.id===editGoalId);
+      await optimisticUpdate(async () => {
+        await updateDoc(doc(db,'users',currentUser.uid,'goals',editGoalId), data);
+      },
+      () => {
+        if (old) {
+          const i = goals.findIndex(g => g.id === editGoalId);
+          if (i !== -1) goals[i] = old;
+        }
+      });
       const i = goals.findIndex(g => g.id === editGoalId);
       if (i !== -1) goals[i] = {...goals[i],...data};
       toast('Goal updated!','🎯');
     } else {
       data.progress = 0; data.createdAt = Timestamp.now();
-      const r = await addDoc(collection(db,'users',currentUser.uid,'goals'), data);
-      goals.unshift({id:r.id,...data, createdAt:new Date()});
+      const fakeId = '_optimistic';
+      goals.unshift({id:fakeId,...data, createdAt:new Date()});
+      await optimisticUpdate(async () => {
+        const r = await addDoc(collection(db,'users',currentUser.uid,'goals'), data);
+        const idx = goals.findIndex(g=>g.id===fakeId);
+        if (idx !== -1) goals[idx] = {id:r.id,...data, createdAt:new Date()};
+      },
+      () => { goals = goals.filter(g=>g.id!==fakeId); });
       toast('Goal created! 🚀','🎯');
     }
     closeModal('goal-modal'); renderAll(); editGoalId = null;
   } catch(e) { toast('Error: '+e.message,'❌'); }
+  finally { if (bar) bar.finish(); }
 };
 
 window.updGoal = async (id, delta) => {
   const g = goals.find(g => g.id === id); if (!g) return;
+  const oldProg = g.progress;
   g.progress = Math.max(0, Math.min(100, (g.progress||0) + delta));
-  await updateDoc(doc(db,'users',currentUser.uid,'goals',id), {progress:g.progress});
-  if (g.progress === 100) toast('🎉 Goal completed!','🏆');
-  renderAll();
+  try {
+    await optimisticUpdate(async () => {
+      await updateDoc(doc(db,'users',currentUser.uid,'goals',id), {progress:g.progress});
+    }, null, () => { g.progress = oldProg; });
+    if (g.progress === 100) toast('🎉 Goal completed!','🏆');
+    renderAll();
+  } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
 window.delGoal = async id => {
   if (!confirm('Delete this goal?')) return;
+  const removed = goals.find(g=>g.id===id);
   goals = goals.filter(g => g.id !== id);
-  await deleteDoc(doc(db,'users',currentUser.uid,'goals',id));
-  renderAll(); toast('Goal removed','🗑️');
+  try {
+    await optimisticUpdate(async () => {
+      await deleteDoc(doc(db,'users',currentUser.uid,'goals',id));
+    }, null, () => {
+      if (removed) goals.unshift(removed);
+    });
+    renderAll(); toast('Goal removed','🗑️');
+  } catch(e) { toast('Error: '+e.message,'❌'); }
 };
 
 function renderGoalsIn(container, list, mini = false) {
@@ -1332,6 +1306,10 @@ function renderAll() {
 ══════════════════════════════════════════════════════════════ */
 function subscribeFeed() {
   if (feedUnsubscribe) return;
+  // clear previous posts so skeletons can appear
+  window.feedPosts = undefined;
+  renderFeed();
+
   const q = query(collection(db,'community_posts'), orderBy('createdAt','desc'), limit(60));
   feedUnsubscribe = onSnapshot(q, snap => {
     feedPosts = snap.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
@@ -1507,7 +1485,7 @@ function renderPostCard(p) {
       ${p.tags?.length ? `<div class="post-tags">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>` : ''}`;
   }
 
-  return `<div class="post-card" id="post-card-${p.id}">
+return `<div class="post-card" id="post-card-${p.id}" data-post-id="${p.id}">
     <div class="post-header">
       <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
       <div class="post-meta">
@@ -1524,7 +1502,7 @@ function renderPostCard(p) {
       <button class="post-action-btn" onclick="repost('${p.id}')">🔁 <span class="post-action-count">${p.repostCount||''}</span></button>
     </div>
     <div class="comments-section" id="comments-${p.id}" style="display:none">
-      <div id="comments-list-${p.id}"><div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div></div>
+      <div id="comments-list-${p.id}"></div><!-- skeleton will be added by loadComments -->
       <div class="comment-input-row">
         <img src="${esc(currentUser?.photoURL||'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff')}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
         <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${p.id}')}">
@@ -1653,6 +1631,141 @@ function relativeTime(date) {
   if (days < 7) return `${days}d ago`;
   return new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
+
+/* ══════════════════════════════════════════════════════════════
+   USER PROFILE MODAL
+   ── IDs match your blade's user-profile-modal partial:
+      #user-profile-modal (.user-profile-modal-backdrop)
+      #upm-cover / #upm-avatar / #upm-name / #upm-username
+      #upm-bio / #upm-info / #upm-posts / #upm-likes
+      #upm-joined / #upm-posts-list
+══════════════════════════════════════════════════════════════ */
+window.openUserProfileModal = async (userId) => {
+  if (!userId) return;
+  const modal = document.getElementById('user-profile-modal');
+  if (!modal) return;
+
+  // open immediately, populate while loading
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  // reset state
+  // use skeletons rather than plain text
+  set('upm-name', '');
+  set('upm-username', '');
+  set('upm-bio', '');
+  set('upm-posts', '—');
+  set('upm-likes', '—');
+  set('upm-joined', '—');
+  const upmNameEl = document.getElementById('upm-name');
+  if (upmNameEl) { upmNameEl.innerHTML = '<span class="skeleton-text" style="width:120px;height:1.2em;display:inline-block"></span>'; }
+  const infoEl = document.getElementById('upm-info');
+  if (infoEl) infoEl.innerHTML = '';
+  const postsListEl = document.getElementById('upm-posts-list');
+  if (postsListEl) {
+    showSkeleton(postsListEl, 3, '<div class="skeleton-text" style="height:20px;margin:4px 0"></div>');
+  }
+  const coverEl = document.getElementById('upm-cover');
+  if (coverEl) coverEl.style.background = 'linear-gradient(135deg,#0d1b2a,#1b3a5c)';
+  const avatarEl = document.getElementById('upm-avatar');
+  if (avatarEl) avatarEl.src = '';
+
+  try {
+    // load profile sub-doc first, fall back to users doc
+    const [profileSnap, userSnap] = await Promise.all([
+      getDoc(doc(db, 'users', userId, 'profile', 'data')).catch(() => null),
+      getDoc(doc(db, 'users', userId)).catch(() => null),
+    ]);
+
+    const profile = profileSnap?.exists() ? profileSnap.data() : {};
+    const userDoc = userSnap?.exists()    ? userSnap.data()    : {};
+
+    // privacy gate
+    if (userDoc.isPublic === false) {
+      set('upm-name', userDoc.displayName || 'Private User');
+      set('upm-bio', 'This profile is private.');
+      if (postsListEl) postsListEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:.8rem">🔒 Private profile</div>';
+      return;
+    }
+
+    const displayName = profile.displayName || userDoc.displayName || 'Anonymous';
+    const username    = profile.username    || userDoc.username    || '';
+    const bio         = profile.bio         || userDoc.bio         || '';
+    const location    = profile.location    || '';
+    const website     = profile.website     || '';
+    const avatarUrl   = profile.avatarUrl   || userDoc.photoURL   ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=4f8ef7&color=fff`;
+    const coverGrad   = profile.coverGradient || 'linear-gradient(135deg,#0d1b2a,#1b3a5c)';
+    const joinedAt    = profile.joinedAt    || userDoc.joinedAt;
+
+    set('upm-name',     displayName);
+    set('upm-username', username ? '@' + username : '');
+    set('upm-bio',      bio);
+
+    if (avatarEl) avatarEl.src = avatarUrl;
+    if (coverEl)  coverEl.style.background = coverGrad;
+
+    if (joinedAt) {
+      const d = joinedAt?.toDate ? joinedAt.toDate() : new Date(joinedAt);
+      set('upm-joined', d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
+    }
+
+    // info row (location / website)
+    if (infoEl) {
+      const parts = [];
+      if (location) parts.push(`📍 ${esc(location)}`);
+      if (website)  parts.push(`🔗 <a href="${esc(website)}" target="_blank" style="color:var(--accent);text-decoration:none">${esc(website.replace(/^https?:\/\//, ''))}</a>`);
+      infoEl.innerHTML = parts.join('<span style="margin:0 8px;opacity:.3">·</span>');
+    }
+
+    // posts
+    const postsSnap = await getDocs(
+      query(collection(db, 'community_posts'),
+        where('authorId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(15))
+    ).catch(() => null);
+
+    const posts     = postsSnap?.docs.map(d => ({ id: d.id, ...d.data() })) || [];
+    const totalLike = posts.reduce((s, p) => s + (p.likes?.length || 0), 0);
+
+    set('upm-posts',  posts.length);
+    set('upm-likes',  totalLike);
+
+    if (postsListEl) {
+      postsListEl.innerHTML = posts.length
+        ? posts.map(p => {
+            const title = p.title || (p.body || '').slice(0, 60) + ((p.body||'').length > 60 ? '…' : '');
+            return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+              <div style="font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:2px">${esc(title)}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)">${relativeTime(p.createdAt?.toDate?.() || p.createdAt)} · ❤️ ${(p.likes||[]).length}</div>
+            </div>`;
+          }).join('')
+        : '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No posts yet.</div>';
+    }
+
+  } catch (err) {
+    console.error('[UserProfileModal]', err);
+    set('upm-name', 'Error loading profile');
+    if (postsListEl) postsListEl.innerHTML = '<div style="font-size:.75rem;color:var(--rose);padding:8px">Could not load profile.</div>';
+  }
+};
+
+window.closeUserProfileModal = () => {
+  const modal = document.getElementById('user-profile-modal');
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+// close on backdrop click
+document.addEventListener('click', e => {
+  const backdrop = document.getElementById('user-profile-modal');
+  if (backdrop?.classList.contains('open') && e.target === backdrop) {
+    window.closeUserProfileModal();
+  }
+});
 
 /* ══════════════════════════════════════════════════════════════
    PROFILE SYSTEM
@@ -1896,66 +2009,6 @@ document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('cl
   if (e.target === m) m.classList.remove('open');
 }));
 
-window.openUserProfileModal = async (userId) => {
-  if (!userId) return;
-  const modal = document.getElementById('user-profile-modal');
-  if (!modal) return;
-  modal.classList.add('open');
-  document.getElementById('upm-posts-list').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">Loading…</div>';
-  document.getElementById('upm-name').textContent = 'Loading...';
-  document.getElementById('upm-username').textContent = '';
-  document.getElementById('upm-bio').textContent = '';
-  document.getElementById('upm-avatar').src = '';
-  document.getElementById('upm-cover').style.background = '';
-  document.getElementById('upm-stat-posts').textContent = '—';
-  document.getElementById('upm-stat-likes').textContent = '—';
-  document.getElementById('upm-stat-joined').textContent = '—';
-  try {
-    const userSnap = await getDoc(doc(db, 'users', userId));
-    if (!userSnap.exists()) {
-      document.getElementById('upm-name').textContent = 'User Not Found';
-      document.getElementById('upm-username').textContent = `@unknown_user`;
-      document.getElementById('upm-bio').textContent = 'This user profile could not be loaded.';
-      document.getElementById('upm-avatar').src = 'https://ui-avatars.com/api/?name=?&background=374151&color=fff';
-      document.getElementById('upm-posts-list').innerHTML = '<div style="text-align:center;padding:8px">🤷‍♂️</div>';
-      return;
-    }
-    const uProf = userSnap.data();
-    const isPublic = uProf.isPublic !== false;
-    if (!isPublic) {
-      document.getElementById('upm-name').textContent = 'Profile is Private';
-      document.getElementById('upm-bio').textContent = 'This user prefers to keep things private.';
-      document.getElementById('upm-posts-list').innerHTML = '<div style="text-align:center;padding:8px">🔒</div>';
-      return;
-    }
-    document.getElementById('upm-name').textContent = uProf.displayName || 'Anonymous';
-    document.getElementById('upm-username').textContent = uProf.username ? `@${uProf.username}` : '';
-    document.getElementById('upm-bio').textContent = uProf.bio || 'No bio yet.';
-    document.getElementById('upm-avatar').src = uProf.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(uProf.displayName||'U')}&background=4f8ef7&color=fff`;
-    document.getElementById('upm-cover').style.background = uProf.coverGradient || 'linear-gradient(135deg,#0d1b2a,#1b3a5c)';
-    document.getElementById('upm-stat-joined').textContent = uProf.joinedAt ? new Date(uProf.joinedAt).toLocaleDateString('en-us',{month:'short',year:'numeric'}) : '—';
-    const postsSnap = await getDocs(query(collection(db,'community_posts'), where('authorId','==',userId), orderBy('createdAt','desc'), limit(10)));
-    const userPosts = postsSnap.docs.map(d => ({id:d.id,...d.data()}));
-    document.getElementById('upm-stat-posts').textContent = userPosts.length;
-    document.getElementById('upm-stat-likes').textContent = userPosts.reduce((acc,p)=>acc+(p.likes?.length||0),0);
-    const postsListEl = document.getElementById('upm-posts-list');
-    postsListEl.innerHTML = userPosts.length
-      ? userPosts.map(p=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.8rem">
-          <a href="#" onclick="event.preventDefault();closeUserProfileModal();openExpandedPost('${p.id}');" style="color:var(--text);text-decoration:none;font-weight:600">${esc(p.title||p.body?.substring(0,50)+'...')}</a>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:3px">${relativeTime(p.createdAt)}</div>
-        </div>`).join('')
-      : '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:var(--muted);padding:8px">No recent posts.</div>';
-  } catch(error) {
-    console.error("Error loading user profile:", error);
-    document.getElementById('upm-name').textContent = 'Error loading profile';
-  }
-};
-
-window.closeUserProfileModal = () => {
-  const modal = document.getElementById('user-profile-modal');
-  if (modal) modal.classList.remove('open');
-};
-
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1972,73 +2025,160 @@ window.toast = (msg, icon='✨') => {
 };
 
 /* ══ GLOBAL EXPANDED POST HANDLER ════════════════════════════ */
-window.openExpandedPost = function(postId) {
-  if(!postId || !window.feedPosts) return;
+window.openExpandedPost = function (postId) {
+  if (!postId || !window.feedPosts) return;
   const p = window.feedPosts.find(x => x.id === postId);
-  if(!p) return;
+  if (!p) return;
   window._expandedPostId = postId;
+
   const cu = window.currentUser;
-  const isOwn = p.authorId === cu?.uid;
-  const liked = (p.likes||[]).includes(cu?.uid);
+  const isOwn  = p.authorId === cu?.uid;
+  const liked  = (p.likes || []).includes(cu?.uid);
   const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
-  const profileOverlay = document.getElementById('post-expand-overlay');
-  const communityOverlay = document.getElementById('post-expand-overlay-comm');
-  const overlay = profileOverlay || communityOverlay;
-  const prefix = profileOverlay ? 'pexp' : 'exp';
-  if(!overlay) return;
-  const avatarEl = document.getElementById(prefix+'-avatar');
-  const timeEl   = document.getElementById(prefix+'-time');
-  const authorEl = document.getElementById(prefix+'-author-row');
-  if(avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
-  if(timeEl)   timeEl.textContent = new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  if(authorEl) {
-    const handle = p.authorUsername || (p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user';
-    authorEl.innerHTML = `
-      <button class="post-author-btn" onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
-        style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;display:inline-flex;align-items:center;gap:5px;padding:0;transition:color .2s"
-        onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color=''">
-        <span style="font-size:.82rem;font-weight:700;color:var(--text)">${esc(p.authorName||'Anonymous')}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">@${esc(handle)}</span>
-      </button>
-      <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type]||p.type}</span>
-      ${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}`;
+
+  // ── choose overlay by active page ────────────────────────
+  const activePage = document.querySelector('.page.active')?.id;
+  const useProfile = activePage === 'page-profile';
+  const overlayId  = useProfile ? 'post-expand-overlay' : 'post-expand-overlay-comm';
+  const prefix     = useProfile ? 'pexp' : 'exp';
+  const overlay    = document.getElementById(overlayId);
+  if (!overlay) return;
+
+  // ── header ────────────────────────────────────────────────
+  const avatarEl = document.getElementById(prefix + '-avatar');
+  const timeEl   = document.getElementById(prefix + '-time');
+  const authorEl = document.getElementById(prefix + '-author-row');
+
+  if (avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
+  if (timeEl)   timeEl.textContent = relativeTime(p.createdAt);
+  if (authorEl) {
+    const handle = p.authorUsername ||
+      (p.authorName || 'anonymous').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user';
+    authorEl.innerHTML =
+      `<button class="post-author-btn"
+          onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
+          style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;
+                 display:inline-flex;align-items:center;gap:5px;padding:0">
+         <span style="font-size:.82rem;font-weight:700;color:rgba(232,234,240,.95)">${esc(p.authorName || 'Anonymous')}</span>
+         <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:rgba(174,184,210,.5)">@${esc(handle)}</span>
+       </button>
+       <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type] || p.type}</span>
+       ${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:rgba(174,184,210,.4);
+                               padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04)">you</span>` : ''}`;
   }
+
+  // ── body ──────────────────────────────────────────────────
   let bodyHtml = '';
-  if(p.title) bodyHtml += `<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3">${esc(p.title)}</div>`;
-  if(p.type==='goal'){
-    bodyHtml += `<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px"><div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${p.progress||0}%"></div></div>
-    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px"><span>${p.categoryIcon||'🎯'} ${esc(p.title||'')}</span><span>${p.progress||0}% complete</span></div>
-    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
-  } else if(p.type==='task'){
-    bodyHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span>${p.priorityIcon||'✅'}</span><span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}</div>
-    ${p.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(p.body)}</div>`:''}`;
+
+  if (p.title) {
+    bodyHtml += `<div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;
+                              letter-spacing:-.02em;margin-bottom:14px;line-height:1.3;
+                              color:rgba(232,234,240,.97)">${esc(p.title)}</div>`;
+  }
+
+  if (p.type === 'goal') {
+    bodyHtml += `
+      <div style="background:rgba(255,255,255,.06);border-radius:99px;height:7px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent,#4f8ef7),var(--lavender,#a78bfa));width:${p.progress || 0}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;
+                  font-size:.65rem;color:rgba(174,184,210,.5);margin-bottom:14px">
+        <span>${p.categoryIcon || '🎯'} ${esc(p.title || '')}</span>
+        <span>${p.progress || 0}% complete</span>
+      </div>
+      ${p.body ? `<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.8;
+                               color:rgba(232,234,240,.75);font-weight:300">${esc(p.body)}</div>` : ''}`;
+
+  } else if (p.type === 'task') {
+    bodyHtml += `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span>${p.priorityIcon || '✅'}</span>
+        <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;
+                     color:rgba(174,184,210,.5);text-transform:uppercase">${p.priority || ''} priority</span>
+        ${p.done ? `<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green,#34d399)">· Done ✓</span>` : ''}
+      </div>
+      ${p.body ? `<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.8;
+                               color:rgba(232,234,240,.75);font-weight:300">${esc(p.body)}</div>` : ''}`;
+
   } else {
-    if(p.moodEmoji) bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`;
-    bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.85;color:rgba(232,234,240,.85);font-weight:300;white-space:pre-wrap;word-break:break-word">${esc(p.body||'')}</div>`;
-    if(p.photoUrls?.length) bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${p.photoUrls.map(u=>`<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`;
-    if(p.tags?.length) bodyHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`;
+    if (p.moodEmoji) {
+      bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;font-family:'JetBrains Mono',monospace;
+                                color:rgba(174,184,210,.45)">feeling ${p.moodEmoji}</div>`;
+    }
+    bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;
+                              color:rgba(232,234,240,.8);font-weight:300;
+                              white-space:pre-wrap;word-break:break-word">${esc(p.body || '')}</div>`;
+    if (p.photoUrls?.length) {
+      bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">
+        ${p.photoUrls.map(u =>
+          `<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;
+                                       border:1px solid rgba(255,255,255,.07);cursor:pointer;
+                                       transition:transform .2s"
+               onmouseover="this.style.transform='scale(1.04)'"
+               onmouseout="this.style.transform=''"
+               onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`
+        ).join('')}
+      </div>`;
+    }
+    if (p.tags?.length) {
+      bodyHtml += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
+        ${p.tags.map(t =>
+          `<span style="font-family:'JetBrains Mono',monospace;font-size:.57rem;font-weight:600;
+                         letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:6px;
+                         background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);
+                         color:rgba(79,142,247,.9)">${esc(t)}</span>`
+        ).join('')}
+      </div>`;
+    }
   }
+
+  // ── comments section ──────────────────────────────────────
   const myAvatar = cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
-  bodyHtml += `<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
-    <div id="${prefix}-comments-list" style="margin-bottom:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div></div>
-    <div class="comment-input-row">
-      <img src="${esc(myAvatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
-      <input class="comment-input" id="${prefix}-comment-input" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
-      <button class="comment-submit" onclick="window._submitCommentGlobal('${postId}')">↵</button>
-    </div>
-  </div>`;
-  const bodyEl = document.getElementById(prefix+'-body');
-  if(bodyEl) bodyEl.innerHTML = bodyHtml;
-  const footerEl = document.getElementById(prefix+'-footer');
-  if(footerEl) {
-    footerEl.innerHTML = `
-      <button class="post-action-btn ${liked?'liked':''}" id="${prefix}-like-btn" onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
-        <span class="heart-icon">${liked?'❤️':'🤍'}</span>
-        <span id="${prefix}-like-count" class="post-action-count">${(p.likes||[]).length||''}</span>
-      </button>
-      <button class="post-action-btn" onclick="event.stopPropagation();repost('${postId}')">🔁 <span class="post-action-count">${p.repostCount||''}</span></button>
-      ${isOwn?`<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>`:''}`;
+  bodyHtml += `
+    <div style="margin-top:22px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
+      <div id="${prefix}-comments-list" style="margin-bottom:14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:rgba(174,184,210,.35)">
+          Loading comments…
+        </div>
+      </div>
+      <div class="comment-input-row">
+        <img src="${esc(myAvatar)}"
+             style="width:28px;height:28px;border-radius:50%;object-fit:cover;
+                    border:1px solid rgba(255,255,255,.08);flex-shrink:0">
+        <input class="comment-input" id="${prefix}-comment-input"
+               placeholder="Write a comment…"
+               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._submitCommentGlobal('${postId}')}">
+        <button class="comment-submit" onclick="window._submitCommentGlobal('${postId}')">↵</button>
+      </div>
+    </div>`;
+
+  const bodyEl = document.getElementById(prefix + '-body');
+  if (bodyEl) {
+    bodyEl.innerHTML = bodyHtml;
+    bodyEl.scrollTop = 0;
   }
+
+  // ── footer actions ────────────────────────────────────────
+  const footerEl = document.getElementById(prefix + '-footer');
+  if (footerEl) {
+    footerEl.innerHTML = `
+      <button class="post-action-btn ${liked ? 'liked' : ''}" id="${prefix}-like-btn"
+              onclick="event.stopPropagation();window._toggleLikeGlobal('${postId}')">
+        <span class="heart-icon">${liked ? '❤️' : '🤍'}</span>
+        <span id="${prefix}-like-count" class="post-action-count">${(p.likes || []).length || ''}</span>
+      </button>
+      <button class="post-action-btn"
+              onclick="event.stopPropagation();repost('${postId}')">
+        🔁 <span class="post-action-count">${p.repostCount || ''}</span>
+      </button>
+      ${isOwn ? `
+        <button class="post-action-btn" style="margin-left:auto;color:var(--rose,#f87171)"
+                onclick="event.stopPropagation();deletePost('${postId}');closeExpandedPost()">
+          🗑️ Delete
+        </button>` : ''}`;
+  }
+
+  // ── open ──────────────────────────────────────────────────
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   window._loadCommentsGlobal(postId);

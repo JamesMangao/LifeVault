@@ -3,6 +3,7 @@
 use App\Http\Controllers\ResumeAnalysisController;
 use App\Http\Controllers\LifeStoryAIController;
 use App\Http\Controllers\ShadowSelfAIController;
+use App\Http\Controllers\HolisticCareerAdvisorController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -25,3 +26,6 @@ Route::get('/ai/life-story/models', [LifeStoryAIController::class, 'models'])
 // ── Shadow Self AI ────────────────────────────────────────────
 Route::post('/ai/shadow-self/analyze', [ShadowSelfAIController::class, 'analyzeShadowSelf'])
     ->name('ai.shadow-self.analyze');
+
+Route::post('/ai/holistic-career/analyze', [HolisticCareerAdvisorController::class, 'analyze'])
+     ->name('ai.holistic-career.analyze');

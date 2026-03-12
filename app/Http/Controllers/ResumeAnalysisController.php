@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use League\CommonMark\CommonMarkConverter;
 use PhpOffice\PhpWord\IOFactory;
 use App\Services\ResumeDocxService;
@@ -20,7 +22,7 @@ class ResumeAnalysisController extends Controller
     {
         try {
             // 1️⃣ Validate
-            $validator = \Validator::make($request->all(), [
+            $validator = Validator::make($request->all(), [
                 'resume_file'     => 'required|mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain|max:5120',
                 'job_description' => 'required|string',
             ]);
@@ -77,7 +79,7 @@ class ResumeAnalysisController extends Controller
                                 }
                             }
                         } catch (\Exception $e) {
-                            \Log::warning('PDF text extraction failed: ' . $e->getMessage());
+                            Log::warning('PDF text extraction failed: ' . $e->getMessage());
                         }
 
                         // — If normal extraction worked, use it —
@@ -85,13 +87,13 @@ class ResumeAnalysisController extends Controller
                             $resumeContent = '<pre>' . htmlspecialchars(trim($extractedText)) . '</pre>';
                         } else {
                             // — Tesseract OCR fallback —
-                            \Log::info('PDF text empty — falling back to Tesseract OCR...');
+                            Log::info('PDF text empty — falling back to Tesseract OCR...');
                             $ocrText = $this->extractTextViaTesseract($tempPath);
 
                             if (!empty(trim($ocrText))) {
                                 $resumeContent = '<pre>' . htmlspecialchars(trim($ocrText)) . '</pre>';
                                 $usedOcr = true;
-                                \Log::info('Tesseract OCR succeeded. Text length: ' . strlen($ocrText));
+                                Log::info('Tesseract OCR succeeded. Text length: ' . strlen($ocrText));
                             } else {
                                 @unlink($tempPath);
                                 return response()->json([
@@ -198,6 +200,7 @@ PROMPT;
                     throw new \Exception('CEREBRAS_API_KEY is not set in .env');
                 }
 
+                // @var \Illuminate\Http\Client\Response $response
                 $response = $client->post('https://api.cerebras.ai/v1/chat/completions', [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $apiKey,
@@ -224,12 +227,12 @@ PROMPT;
 
                 $body = json_decode($response->getBody()->getContents(), true);
 
-                \Log::info('Cerebras raw response: ' . json_encode($body));
+                Log::info('Cerebras raw response: ' . json_encode($body));
 
                 if (!empty($body['choices'][0]['message']['content'])) {
                     $markdown = $body['choices'][0]['message']['content'];
 
-                    \Log::info('Cerebras markdown (first 500): ' . mb_substr($markdown, 0, 500));
+                    Log::info('Cerebras markdown (first 500): ' . mb_substr($markdown, 0, 500));
 
                     // Extract match score — multiple patterns for robustness
                     $scorePatterns = [
@@ -263,16 +266,16 @@ PROMPT;
 
             } catch (\GuzzleHttp\Exception\ClientException $e) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
-                \Log::error('Cerebras API ClientException: ' . $errorBody);
+                Log::error('Cerebras API ClientException: ' . $errorBody);
                 $suggestionsHtml = '<p>AI Error (4xx): ' . htmlspecialchars($errorBody) . '</p>';
                 $markdown        = '## Error' . "\n" . $errorBody;
             } catch (\GuzzleHttp\Exception\ServerException $e) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
-                \Log::error('Cerebras API ServerException: ' . $errorBody);
+                Log::error('Cerebras API ServerException: ' . $errorBody);
                 $suggestionsHtml = '<p>AI Error (5xx): ' . htmlspecialchars($errorBody) . '</p>';
                 $markdown        = '## Error' . "\n" . $errorBody;
             } catch (\Exception $e) {
-                \Log::error('Cerebras API General Error: ' . $e->getMessage());
+                Log::error('Cerebras API General Error: ' . $e->getMessage());
                 $suggestionsHtml = '<p>AI Error: ' . htmlspecialchars($e->getMessage()) . '</p>';
                 $markdown        = '## Error' . "\n" . $e->getMessage();
             }
@@ -290,7 +293,7 @@ PROMPT;
             ]);
 
         } catch (\Throwable $e) {
-            \Log::error('Resume AJAX Error', [
+            Log::error('Resume AJAX Error', [
                 'message' => $e->getMessage(),
                 'file'    => $e->getFile(),
                 'line'    => $e->getLine(),
@@ -316,12 +319,12 @@ PROMPT;
 
         // Verify both binaries exist
         if (!file_exists($tesseractBin)) {
-            \Log::error('Tesseract binary not found at: ' . $tesseractBin);
+            Log::error('Tesseract binary not found at: ' . $tesseractBin);
             return '';
         }
 
         if (!file_exists($pdftoppmBin)) {
-            \Log::error('pdftoppm binary not found at: ' . $pdftoppmBin);
+            Log::error('pdftoppm binary not found at: ' . $pdftoppmBin);
             return '';
         }
 
@@ -342,8 +345,8 @@ PROMPT;
                 . ' 2>&1';
 
             exec($cmd, $ppmOutput, $ppmCode);
-            \Log::info('pdftoppm exit code: ' . $ppmCode);
-            \Log::info('pdftoppm output: ' . implode(' | ', $ppmOutput));
+            Log::info('pdftoppm exit code: ' . $ppmCode);
+            Log::info('pdftoppm output: ' . implode(' | ', $ppmOutput));
 
             $pageFiles = glob($workDir . DIRECTORY_SEPARATOR . 'page-*.png') ?: [];
 
@@ -353,14 +356,14 @@ PROMPT;
             }
 
             if (empty($pageFiles)) {
-                \Log::error('pdftoppm produced no PNG files. Output: ' . implode(' ', $ppmOutput));
+                Log::error('pdftoppm produced no PNG files. Output: ' . implode(' ', $ppmOutput));
                 return '';
             }
 
             sort($pageFiles); // ensure correct page order
             $pageFiles = array_slice($pageFiles, 0, 6); // cap at 6 pages
 
-            \Log::info('pdftoppm produced ' . count($pageFiles) . ' page(s).');
+            Log::info('pdftoppm produced ' . count($pageFiles) . ' page(s).');
 
             // ── Step 2: Tesseract OCR on each PNG ───────────────────────
             foreach ($pageFiles as $pagePng) {
@@ -376,7 +379,7 @@ PROMPT;
                     . ' 2>&1';
 
                 exec($cmd, $tessOutput, $tessCode);
-                \Log::info('Tesseract on ' . basename($pagePng) . ' exit: ' . $tessCode);
+                Log::info('Tesseract on ' . basename($pagePng) . ' exit: ' . $tessCode);
 
                 $txtFile = $outBase . '.txt';
                 if (file_exists($txtFile)) {
@@ -384,8 +387,8 @@ PROMPT;
                     $allText .= $pageText . "\n\n";
                     @unlink($txtFile);
                 } else {
-                    \Log::warning('Tesseract produced no .txt for: ' . basename($pagePng));
-                    \Log::warning('Tesseract output: ' . implode(' | ', $tessOutput));
+                    Log::warning('Tesseract produced no .txt for: ' . basename($pagePng));
+                    Log::warning('Tesseract output: ' . implode(' | ', $tessOutput));
                 }
 
                 @unlink($pagePng);
@@ -419,4 +422,29 @@ PROMPT;
 
         return response()->download($path)->deleteFileAfterSend();
     }
+    /**
+ * Recursively extracts plain text from a PHPWord element.
+ *
+ * @param mixed $element The PHPWord element (e.g., Section, TextRun, Table).
+ * @return string
+ */
+function extractTextFromElement($element): string
+{
+    $text = '';
+
+    if (method_exists($element, 'getText')) {
+        $text .= $element->getText();
+    } elseif (method_exists($element, 'getElements')) {
+        $childElements = $element->getElements();
+        foreach ($childElements as $childElement) {
+            $text .= extractTextFromElement($childElement);
+        }
+        // Add space/newline after complex elements like tables or paragraphs for readability
+        if ($element instanceof \PhpOffice\PhpWord\Element\Table || $element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+            $text .= "\n";
+        }
+    }
+
+    return $text;
+}
 }

@@ -7,7 +7,7 @@
     <title>LifeVault — Your Personal Space</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ time() }}">
 
     <script>
         window.firebaseConfig = {
@@ -21,70 +21,11 @@
         };
     </script>
 
-    <style>
-        /* Profile Modal */
-        .user-profile-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(11, 15, 26, .9);
-            z-index: 300;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            cursor: pointer;
-        }
-        .user-profile-modal-backdrop.open {
-            display: flex;
-        }
-        .user-profile-modal {
-            background: var(--bg-deep);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            width: 100%;
-            max-width: 700px;
-            max-height: 90vh;
-            overflow-y: auto;
-            cursor: default;
-            animation: modal-in .2s ease-out;
-        }
 
-        /* Journal Entry Expansion */
-        .entry-preview {
-            -webkit-line-clamp: 3;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            font-size: .8rem;
-            color: var(--muted);
-            line-height: 1.6;
-            margin-top: 8px;
-            cursor: pointer;
-        }
-        .entry-preview.expanded {
-            -webkit-line-clamp: unset;
-            overflow: visible;
-        }
-        .journal-entry .entry-expand-hint {
-            display: none;
-            text-align: right;
-            font-size: .65rem;
-            color: var(--muted-dark);
-            margin-top: 8px;
-            font-style: italic;
-        }
-        .journal-entry:hover .entry-expand-hint {
-            display: block;
-        }
-    </style>
 </head>
 <body>
 
-    <div id="user-profile-modal" class="user-profile-modal-backdrop">
-        <div class="user-profile-modal">
-            {{-- Content will be injected by JS --}}
-        </div>
-    </div>
+
 
     <div id="loading">
         <div class="loader-logo">LifeVault</div>
@@ -122,6 +63,7 @@
             @include('analyzer')
             @include('shadow-self')
             @include('life-story')
+            @include('holistic-career')
             @include('settings')
             @include('profile')
             @include('saved')
@@ -129,11 +71,7 @@
     </div>
 
     {{-- User Profile Modal --}}
-<div id="user-profile-modal" class="user-profile-modal-backdrop">
-    <div class="user-profile-modal">
-        {{-- Content will be injected by JS --}}
-    </div>
-</div>
+    @include('layouts.partials.user-profile-modal')
 
 <style>
 .user-profile-modal-backdrop {
@@ -232,7 +170,25 @@
 
 {{-- Then your existing lines follow: --}}
 <script src="{{ asset('js/app.js') }}?v={{ time() }}" type="module"></script>
+<script src="{{ asset('js/profile-popup.js') }}?v={{ time() }}"></script>
 @stack('scripts')
 
+  <!-- profile popup markup -->
+  <div id="profile-popup">
+    <div class="pp-header">
+      <img class="pp-avatar" id="pp-avatar" src="" alt="">
+      <div style="min-width:0">
+        <div class="pp-name" id="pp-name" style="color: var(--text);"></div>
+        <div class="pp-email" id="pp-email"></div>
+      </div>
+    </div>
+    <div class="pp-menu">
+      <div class="pp-item" style="color: var(--text);" onclick="navigateTo('profile');closeProfilePopup()"><span class="pp-icon">👤</span> View Profile</div>
+      <div class="pp-item" style="color: var(--text);" onclick="navigateTo('settings');closeProfilePopup()"><span class="pp-icon">⚙️</span> Settings</div>
+      <div class="pp-item" style="color: var(--text);" onclick="exportAsJSON();closeProfilePopup()"><span class="pp-icon">💾</span> Export Backup</div>
+      <div class="pp-divider"></div>
+      <div class="pp-item pp-item--danger" onclick="closeProfilePopup();signOutUser()"><span class="pp-icon">⏻</span> Sign Out</div>
+    </div>
+  </div>
 </body>
 </html>

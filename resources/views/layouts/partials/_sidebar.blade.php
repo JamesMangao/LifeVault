@@ -28,13 +28,16 @@
     <div class="nav-item" data-page="analyzer" onclick="navigateTo('analyzer', event)"><span class="nav-icon">📄</span> Resume Analyzer</div>
     <div class="nav-item" data-page="shadow-self" onclick="navigateTo('shadow-self', event)"><span class="nav-icon">🪞</span> Shadow Self Analyzer</div>
     <div class="nav-item" data-page="life-story" onclick="navigateTo('life-story', event)"><span class="nav-icon">📖</span> Life Story Generator</div>
+    <div class="nav-item" data-page="holistic-career" onclick="navigateTo('holistic-career', event)">
+        <span class="nav-icon">🔮</span> Holistic Career Advisor
+    </div>
     <div class="nav-item" data-page="saved" onclick="navigateTo('saved', event)"><span class="nav-icon">🔖</span> Saved Items</div>
 
     <div class="nav-section-label">System</div>
     <div class="nav-item" data-page="settings" onclick="navigateTo('settings', event)"><span class="nav-icon">⚙️</span> Settings</div>
 
     <div class="sidebar-bottom">
-        <div class="user-card">
+        <div class="user-card" onclick="toggleProfilePopup(event)">
             <img id="user-avatar" src="" alt="User" class="user-avatar">
             <div class="user-info">
                 <div id="user-name" class="user-name"></div>

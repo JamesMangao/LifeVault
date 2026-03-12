@@ -36,8 +36,9 @@
 .feed-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
 .feed-filter-btn{font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:7px 14px;border-radius:99px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .18s;text-transform:uppercase;letter-spacing:.06em}
 .feed-filter-btn:hover,.feed-filter-btn.active{background:rgba(79,142,247,.12);border-color:rgba(79,142,247,.35);color:var(--accent)}
-.post-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;transition:border-color .2s,box-shadow .2s;animation:slideDown .3s ease both;cursor:pointer}
+.post-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;transition:border-color .2s,box-shadow .2s;animation:slideDown .3s ease both}
 .post-card:hover{border-color:rgba(79,142,247,.25);box-shadow:0 4px 20px rgba(79,142,247,.08)}
+.post-card-body{cursor:pointer}
 .post-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .post-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border);flex-shrink:0}
 .post-meta{flex:1;min-width:0}
@@ -96,7 +97,7 @@
 .comment-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text);font-family:'Newsreader',serif;font-size:.82rem;outline:none;transition:border-color .2s;font-weight:300}
 .comment-input:focus{border-color:var(--accent)}
 .comment-submit{background:var(--accent);border:none;color:white;padding:9px 14px;border-radius:10px;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Syne',sans-serif}
-/* Share modal — uses unique class names to avoid collision with app.css .modal-backdrop */
+/* Share modal */
 .comm-modal-backdrop{position:fixed;inset:0;background:rgba(11,15,26,.92);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
 .comm-modal-backdrop.open{display:flex}
 .comm-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;max-width:580px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 40px 80px rgba(0,0,0,.5)}
@@ -155,7 +156,7 @@
       <button class="feed-filter-btn" onclick="filterFeed('goal',this)">🎯 Goals</button>
       <button class="feed-filter-btn" onclick="filterFeed('mine',this)">👤 Mine</button>
     </div>
-    <div id="feed-list"><div class="loading-posts">Loading community posts…</div></div>
+    <div id="feed-list"></div>
   </div>
 </div>
 
@@ -192,14 +193,6 @@
 (function(){
   const TYPE_BADGES      = {thought:'💭 Thought',journal:'📓 Journal',task:'✅ Task',goal:'🎯 Goal'};
   const TYPE_BADGE_CLASS = {thought:'badge-journal',journal:'badge-journal',task:'badge-task',goal:'badge-goal'};
-  const COVER_PRESETS    = [
-    'linear-gradient(135deg,#0d1b2a,#1b3a5c,#0d1b2a)',
-    'linear-gradient(135deg,#0f0c29,#302b63,#24243e)',
-    'linear-gradient(135deg,#093028,#237a57,#093028)',
-    'linear-gradient(135deg,#1a0533,#3d1a7a,#11998e)',
-    'linear-gradient(135deg,#200122,#6f0000,#200122)',
-    'linear-gradient(135deg,#141e30,#243b55,#141e30)'
-  ];
 
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function relativeTime(date){
@@ -217,68 +210,7 @@
 
 
 
-  /* ── renderPostCard ── */
-  function renderPostCard(p){
-    if(!window.currentUser) return '';
-    const isOwn=p.authorId===window.currentUser.uid, liked=(p.likes||[]).includes(window.currentUser.uid);
-    const timeAgo=relativeTime(p.createdAt), bc=TYPE_BADGE_CLASS[p.type]||'badge-journal', handle=getHandle(p);
-    const repost=p.isRepost?`<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(p.originalAuthorAvatar||'')}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"><span>${esc(p.originalAuthorName||'')}</span></div>`:'';
-    let body='';
-    if(p.type==='goal'){
-      body=`<div class="post-goal-bar"><div class="post-goal-fill" style="width:${p.progress||0}%"></div></div><div class="post-goal-meta"><span>${p.categoryIcon||'🎯'}</span><span>${p.progress||0}% complete</span></div>${p.body?`<div class="post-body">${esc(p.body)}</div>`:''}`;
-    } else if(p.type==='task'){
-      body=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span>${p.priorityIcon||'✅'}</span><span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}</div>${p.body?`<div class="post-body">${esc(p.body)}</div>`:''}`;
-    } else {
-      const long=(p.body||'').length>300;
-      body=`<div class="post-body" id="post-body-${p.id}">${esc(p.body||'')}</div>${long?`<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${p.id}')">Read more ↓</span>`:''}${p.moodEmoji?`<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`:''}${p.photoUrls?.length?`<div class="post-photos">${p.photoUrls.map(u=>`<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`:''}${p.tags?.length?`<div class="post-tags">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`:''}`;
-    }
-    return `<div class="post-card" data-post-id="${p.id}">
-      <div class="post-header">
-        <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
-        <div class="post-meta">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <button class="post-author-btn" onclick="event.stopPropagation();openUserProfileModal('${p.authorId}')">
-              <span class="post-author-name">${esc(p.authorName||'Anonymous')}</span>
-              <span class="post-author-username">@${esc(handle)}</span>
-            </button>
-            <span class="post-type-badge ${bc}">${TYPE_BADGES[p.type]||p.type}</span>
-            ${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}
-          </div>
-          <div class="post-time">${timeAgo}</div>
-        </div>
-        ${isOwn?`<button class="post-delete-btn" onclick="event.stopPropagation();deletePost('${p.id}')">🗑️</button>`:''}
-      </div>
-      ${p.title?`<div class="post-title">${esc(p.title)}</div>`:''}
-      ${repost}${body}
-      <div class="post-actions" onclick="event.stopPropagation()">
-        <button class="post-action-btn ${liked?'liked':''}" onclick="toggleLike('${p.id}')"><span class="heart-icon">${liked?'❤️':'🤍'}</span><span class="post-action-count">${(p.likes||[]).length||''}</span></button>
-        <button class="post-action-btn" onclick="openExpandedPost('${p.id}')">💬 <span class="post-action-count" id="comment-count-${p.id}">${p.commentCount||0}</span></button>
-        <button class="post-action-btn" onclick="repost('${p.id}')">🔁 <span class="post-action-count">${p.repostCount||''}</span></button>
-      </div>
-    </div>`;
-  }
-  window.renderPostCard=renderPostCard;
-
-  window.renderFeed=function(){
-    const feedList=document.getElementById('feed-list'); if(!feedList) return;
-    const cu=window.currentUser;
-    const cName=window.userProfile?.displayName||cu?.displayName||'Anonymous';
-    const cAv=window.userProfile?.avatarUrl||cu?.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(cName)}&background=4f8ef7&color=fff`;
-    let posts=(window.feedPosts||[]).map(p=>p.authorId===cu?.uid?{...p,authorName:cName,authorAvatar:cAv}:p);
-    if(_currentFilter==='mine') posts=posts.filter(p=>p.authorId===cu?.uid);
-    else if(_currentFilter!=='all') posts=posts.filter(p=>p.type===_currentFilter);
-    if(!posts.length){
-      feedList.innerHTML=`<div class="feed-empty"><div class="empty-icon">🌱</div><div class="empty-title">Nothing here yet</div><div class="empty-sub">${_currentFilter==='mine'?'You haven\'t shared anything yet.':'Be the first to post something!'}</div></div>`;
-      return;
-    }
-    feedList.innerHTML=posts.map(p=>renderPostCard(p)).join('');
-    const all=window.feedPosts||[];
-    const $=id=>document.getElementById(id);
-    if($('comm-stat-posts')) $('comm-stat-posts').textContent=all.length;
-    if($('comm-stat-likes')) $('comm-stat-likes').textContent=all.reduce((s,p)=>s+(p.likes?.length||0),0);
-    if($('comm-stat-members')) $('comm-stat-members').textContent=new Set(all.map(p=>p.authorId)).size;
-  };
-
+  /* ── filterFeed ── */
   window.filterFeed=function(type,btn){
     _currentFilter=type;
     document.querySelectorAll('.feed-filter-btn').forEach(b=>b.classList.remove('active'));
@@ -286,6 +218,7 @@
     window.renderFeed();
   };
 
+  /* ── composer helpers ── */
   window.setComposerType=function(type){
     _composerType=type;
     document.querySelectorAll('.composer-type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===type));
@@ -299,17 +232,21 @@
       reader.onload=ev=>{
         _composerPhotos.push(ev.target.result);
         const div=document.createElement('div'); div.className='composer-img-preview';
-        div.innerHTML=`<img src="${ev.target.result}"><button class="composer-img-remove" onclick="removeComposerPhoto(${_composerPhotos.length-1},this.parentElement)">✕</button>`;
+        div.innerHTML=`<img src="${ev.target.result}">
+          <button class="composer-img-remove"
+                  onclick="removeComposerPhoto(${_composerPhotos.length-1},this.parentElement)">✕</button>`;
         preview.appendChild(div);
       };
       reader.readAsDataURL(file);
     });
   };
+
   window.removeComposerPhoto=function(idx,el){
     _composerPhotos.splice(idx,1); el.remove();
     if(!_composerPhotos.length) document.getElementById('composer-img-previews').style.display='none';
   };
 
+  /* ── postThought ── */
   window.postThought=async function(){
     const text=document.getElementById('composer-text').value.trim();
     if(!text&&!_composerPhotos.length){ window.toast?.('Write something first!','💭'); return; }
@@ -331,6 +268,7 @@
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── toggleLike ── */
   window.toggleLike=async function(postId){
     const cu=window.currentUser; if(!cu) return;
     const post=(window.feedPosts||[]).find(p=>p.id===postId); if(!post) return;
@@ -341,6 +279,7 @@
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── toggleReadMore ── */
   window.toggleReadMore=function(postId){
     const el=document.getElementById('post-body-'+postId); if(!el) return;
     const expanded=el.style.webkitLineClamp==='unset';
@@ -350,6 +289,7 @@
     if(btn&&btn.classList.contains('post-read-more')) btn.textContent=expanded?'Read more ↓':'Show less ↑';
   };
 
+  /* ── viewPhoto ── */
   window.viewPhoto=function(url){
     const overlay=document.createElement('div');
     overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999999;display:flex;align-items:center;justify-content:center;cursor:pointer';
@@ -358,6 +298,7 @@
     document.body.appendChild(overlay);
   };
 
+  /* ── deletePost ── */
   window.deletePost=async function(postId){
     if(!confirm('Delete this post?')) return;
     try{
@@ -367,6 +308,7 @@
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── repost ── */
   window.repost=async function(postId){
     const cu=window.currentUser; if(!cu) return;
     const original=(window.feedPosts||[]).find(p=>p.id===postId); if(!original) return;
@@ -380,7 +322,8 @@
         type:original.type,title:original.title,body:original.body,
         authorId:cu.uid,authorName,authorAvatar,
         authorUsername:p.username||(authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user'),
-        isRepost:true,originalPostId:postId,originalAuthorName:original.authorName,originalAuthorAvatar:original.authorAvatar,
+        isRepost:true,originalPostId:postId,
+        originalAuthorName:original.authorName,originalAuthorAvatar:original.authorAvatar,
         likes:[],commentCount:0,repostCount:0,createdAt:serverTimestamp(),
       });
       await updateDoc(doc(window.db,'community_posts',postId),{repostCount:increment(1)});
@@ -388,52 +331,183 @@
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ─────────────────────────────────────────────
+     openExpandedPost
+     Works for ALL post types: thought, journal,
+     task, goal. Triggered by the card root click.
+  ───────────────────────────────────────────── */
   window.openExpandedPost=function(postId){
     const post=(window.feedPosts||[]).find(p=>p.id===postId); if(!post) return;
     _expandedPostId=postId;
     const cu=window.currentUser, isOwn=post.authorId===cu?.uid, liked=(post.likes||[]).includes(cu?.uid);
     const bc=TYPE_BADGE_CLASS[post.type]||'badge-journal', handle=getHandle(post);
+
+    /* header */
     document.getElementById('exp-avatar').src=post.authorAvatar||'';
-    document.getElementById('exp-time').textContent=new Date(post.createdAt).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    document.getElementById('exp-author-row').innerHTML=`<button class="post-author-btn" onclick="closeExpandedPost();setTimeout(()=>openUserProfileModal('${esc(post.authorId)}'),200)"><span class="post-author-name">${esc(post.authorName||'Anonymous')}</span><span class="post-author-username">@${esc(handle)}</span></button><span class="post-type-badge ${bc}">${TYPE_BADGES[post.type]||post.type}</span>${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}`;
+    document.getElementById('exp-time').textContent=
+      post.createdAt
+        ? new Date(post.createdAt).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})
+        : '';
+    document.getElementById('exp-author-row').innerHTML=`
+      <button class="post-author-btn"
+              onclick="closeExpandedPost();setTimeout(()=>openUserProfileModal('${esc(post.authorId)}'),200)">
+        <span class="post-author-name">${esc(post.authorName||'Anonymous')}</span>
+        <span class="post-author-username">@${esc(handle)}</span>
+      </button>
+      <span class="post-type-badge ${bc}">${TYPE_BADGES[post.type]||post.type}</span>
+      ${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);
+                            padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}`;
+
+    /* body */
     let bodyHtml='';
-    if(post.title) bodyHtml+=`<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3">${esc(post.title)}</div>`;
+
+    if(post.title)
+      bodyHtml+=`<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;
+                              margin-bottom:14px;line-height:1.3">${esc(post.title)}</div>`;
+
     if(post.type==='goal'){
-      bodyHtml+=`<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px"><div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));width:${post.progress||0}%"></div></div><div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);margin-bottom:14px"><span>${post.categoryIcon||'🎯'}</span><span>${post.progress||0}% complete</span></div>${post.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(post.body)}</div>`:''}`;
+      bodyHtml+=`
+        <div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px">
+          <div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--lavender));
+                      width:${post.progress||0}%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;
+                    font-size:.65rem;color:var(--muted);margin-bottom:14px">
+          <span>${post.categoryIcon||'🎯'} ${esc(post.title||'')}</span>
+          <span>${post.progress||0}% complete</span>
+        </div>
+        ${post.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;
+                                 color:rgba(232,234,240,.8);font-weight:300">${esc(post.body)}</div>`:''}`;
+
     } else if(post.type==='task'){
-      bodyHtml+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span>${post.priorityIcon||'✅'}</span><span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${post.priority||''} priority</span>${post.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}</div>${post.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;color:rgba(232,234,240,.8);font-weight:300">${esc(post.body)}</div>`:''}`;
+      bodyHtml+=`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span>${post.priorityIcon||'✅'}</span>
+          <span style="font-size:.75rem;font-family:'JetBrains Mono',monospace;
+                       color:var(--muted);text-transform:uppercase">${post.priority||''} priority</span>
+          ${post.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;
+                                    color:var(--green)">· Done ✓</span>`:''}
+        </div>
+        ${post.body?`<div style="font-family:'Newsreader',serif;font-size:.95rem;line-height:1.75;
+                                 color:rgba(232,234,240,.8);font-weight:300">${esc(post.body)}</div>`:''}`;
+
     } else {
-      if(post.moodEmoji) bodyHtml+=`<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${post.moodEmoji}</div>`;
-      bodyHtml+=`<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.85;color:rgba(232,234,240,.85);font-weight:300;white-space:pre-wrap;word-break:break-word">${esc(post.body||'')}</div>`;
-      if(post.photoUrls?.length) bodyHtml+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${post.photoUrls.map(u=>`<img src="${esc(u)}" style="width:120px;height:120px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="viewPhoto('${esc(u)}')">`).join('')}</div>`;
-      if(post.tags?.length) bodyHtml+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">${post.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`;
+      /* thought / journal */
+      if(post.moodEmoji)
+        bodyHtml+=`<div style="margin-bottom:12px;font-size:.8rem;color:var(--muted);
+                                font-family:'JetBrains Mono',monospace">feeling ${post.moodEmoji}</div>`;
+
+      bodyHtml+=`<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.85;
+                              color:rgba(232,234,240,.85);font-weight:300;
+                              white-space:pre-wrap;word-break:break-word">${esc(post.body||'')}</div>`;
+
+      if(post.photoUrls?.length)
+        bodyHtml+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+          ${post.photoUrls.map(u=>`<img src="${esc(u)}"
+               style="width:120px;height:120px;border-radius:10px;object-fit:cover;
+                      border:1px solid var(--border);cursor:pointer;transition:transform .2s"
+               onmouseover="this.style.transform='scale(1.04)'"
+               onmouseout="this.style.transform=''"
+               onclick="viewPhoto('${esc(u)}')">`).join('')}
+        </div>`;
+
+      if(post.tags?.length)
+        bodyHtml+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
+          ${post.tags.map(t=>`<span class="tag"
+               style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}
+        </div>`;
     }
-    const myAv=window.userProfile?.avatarUrl||cu?.photoURL||`https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
-    bodyHtml+=`<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)"><div id="exp-comments-list" style="margin-bottom:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">Loading comments…</div></div><div class="comment-input-row"><img src="${esc(myAv)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0"><input class="comment-input" id="exp-comment-input" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${postId}')}"><button class="comment-submit" onclick="submitComment('${postId}')">↵</button></div></div>`;
-    document.getElementById('exp-body').innerHTML=bodyHtml;
-    document.getElementById('exp-footer').innerHTML=`<button class="post-action-btn ${liked?'liked':''}" id="exp-like-btn" onclick="toggleLikeExpanded('${postId}')"><span class="heart-icon">${liked?'❤️':'🤍'}</span><span id="exp-like-count" class="post-action-count">${(post.likes||[]).length||''}</span></button><button class="post-action-btn" onclick="repost('${postId}')">🔁 <span class="post-action-count">${post.repostCount||''}</span></button>${isOwn?`<button class="post-action-btn" style="margin-left:auto;color:var(--rose)" onclick="deletePost('${postId}');closeExpandedPost()">🗑️ Delete</button>`:''}`;
+
+    /* comments section */
+    const myAv=window.userProfile?.avatarUrl||cu?.photoURL||
+      `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
+    bodyHtml+=`
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+        <div id="exp-comments-list" style="margin-bottom:12px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted)">
+            Loading comments…
+          </div>
+        </div>
+        <div class="comment-input-row">
+          <img src="${esc(myAv)}"
+               style="width:28px;height:28px;border-radius:50%;object-fit:cover;
+                      border:1px solid var(--border);flex-shrink:0">
+          <input class="comment-input" id="exp-comment-input"
+                 placeholder="Write a comment…"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${postId}')}">
+          <button class="comment-submit" onclick="submitComment('${postId}')">↵</button>
+        </div>
+      </div>`;
+
+    const bodyEl=document.getElementById('exp-body');
+    if(bodyEl){ bodyEl.innerHTML=bodyHtml; bodyEl.scrollTop=0; }
+
+    /* footer actions */
+    document.getElementById('exp-footer').innerHTML=`
+      <button class="post-action-btn ${liked?'liked':''}" id="exp-like-btn"
+              onclick="toggleLikeExpanded('${postId}')">
+        <span class="heart-icon">${liked?'❤️':'🤍'}</span>
+        <span id="exp-like-count" class="post-action-count">${(post.likes||[]).length||''}</span>
+      </button>
+      <button class="post-action-btn" onclick="repost('${postId}')">
+        🔁 <span class="post-action-count">${post.repostCount||''}</span>
+      </button>
+      ${isOwn?`<button class="post-action-btn"
+                       style="margin-left:auto;color:var(--rose)"
+                       onclick="deletePost('${postId}');closeExpandedPost()">
+                 🗑️ Delete
+               </button>`:''}`;
+
     document.getElementById('post-expand-overlay-comm').classList.add('open');
     document.body.style.overflow='hidden';
     loadComments(postId);
   };
 
+  /* ── closeExpandedPost ── */
   window.closeExpandedPost=function(){
     document.getElementById('post-expand-overlay-comm').classList.remove('open');
-    document.body.style.overflow=''; _expandedPostId=null;
+    document.body.style.overflow='';
+    _expandedPostId=null;
   };
 
+  /* ── loadComments ── */
   async function loadComments(postId){
     const listEl=document.getElementById('exp-comments-list'); if(!listEl) return;
     try{
       const{getDocs,query,collection,orderBy}=window._fbFS;
       const snap=await getDocs(query(collection(window.db,'community_posts',postId,'comments'),orderBy('createdAt','asc')));
       const comments=snap.docs.map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate()}));
-      if(!comments.length){ listEl.innerHTML=`<div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">No comments yet. Be first!</div>`; return; }
+      if(!comments.length){
+        listEl.innerHTML=`<div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted)">No comments yet. Be first!</div>`;
+        return;
+      }
       const cu=window.currentUser;
-      listEl.innerHTML=comments.map(c=>`<div class="comment-item"><img src="${esc(c.authorAvatar||'')}" class="comment-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'"><div class="comment-bubble"><div class="comment-author"><span>${esc(c.authorName||'Anonymous')}</span>${c.authorId===cu?.uid?`<button class="comment-del" onclick="deleteComment('${postId}','${c.id}')">✕</button>`:''}</div><div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">${c.createdAt?new Date(c.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div><div class="comment-text">${esc(c.text)}</div></div></div>`).join('');
-    }catch(err){ listEl.innerHTML=`<div style="font-size:.72rem;color:var(--muted)">Could not load comments.</div>`; }
+      listEl.innerHTML=comments.map(c=>`
+        <div class="comment-item">
+          <img src="${esc(c.authorAvatar||'')}" class="comment-avatar"
+               onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+          <div class="comment-bubble">
+            <div class="comment-author">
+              <span>${esc(c.authorName||'Anonymous')}</span>
+              ${c.authorId===cu?.uid
+                ? `<button class="comment-del" onclick="deleteComment('${postId}','${c.id}')">✕</button>`
+                : ''}
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">
+              ${c.createdAt
+                ? new Date(c.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+                : ''}
+            </div>
+            <div class="comment-text">${esc(c.text)}</div>
+          </div>
+        </div>`).join('');
+    }catch(err){
+      const listEl=document.getElementById('exp-comments-list');
+      if(listEl) listEl.innerHTML=`<div style="font-size:.72rem;color:var(--muted)">Could not load comments.</div>`;
+    }
   }
 
+  /* ── submitComment ── */
   window.submitComment=async function(postId){
     const input=document.getElementById('exp-comment-input');
     const text=input?.value.trim(); if(!text) return; input.value='';
@@ -443,12 +517,15 @@
     const authorAvatar=p.avatarUrl||cu.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
     try{
       const{addDoc,collection,serverTimestamp,updateDoc,doc,increment}=window._fbFS;
-      await addDoc(collection(window.db,'community_posts',postId,'comments'),{text,authorId:cu.uid,authorName,authorAvatar,createdAt:serverTimestamp()});
+      await addDoc(collection(window.db,'community_posts',postId,'comments'),{
+        text,authorId:cu.uid,authorName,authorAvatar,createdAt:serverTimestamp()
+      });
       await updateDoc(doc(window.db,'community_posts',postId),{commentCount:increment(1)});
       loadComments(postId);
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── deleteComment ── */
   window.deleteComment=async function(postId,commentId){
     try{
       const{deleteDoc,doc,updateDoc,increment}=window._fbFS;
@@ -458,38 +535,127 @@
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── toggleLikeExpanded ── */
   window.toggleLikeExpanded=async function(postId){
     const post=(window.feedPosts||[]).find(p=>p.id===postId); if(!post) return;
     const cu=window.currentUser, liked=(post.likes||[]).includes(cu?.uid);
     try{
       const{updateDoc,doc,arrayUnion,arrayRemove}=window._fbFS;
-      await updateDoc(doc(window.db,'community_posts',postId),{likes:liked?arrayRemove(cu.uid):arrayUnion(cu.uid)});
-      const btn=document.getElementById('exp-like-btn'), cnt=document.getElementById('exp-like-count');
+      await updateDoc(doc(window.db,'community_posts',postId),{
+        likes:liked?arrayRemove(cu.uid):arrayUnion(cu.uid)
+      });
+      const btn=document.getElementById('exp-like-btn');
+      const cnt=document.getElementById('exp-like-count');
       if(btn) btn.classList.toggle('liked',!liked);
-      if(cnt){ const n=liked?Math.max(0,(parseInt(cnt.textContent)||0)-1):(parseInt(cnt.textContent)||0)+1; cnt.textContent=n||''; }
-      const hrt=btn?.querySelector('.heart-icon'); if(hrt) hrt.textContent=liked?'🤍':'❤️';
+      if(cnt){
+        const n=liked
+          ? Math.max(0,(parseInt(cnt.textContent)||0)-1)
+          : (parseInt(cnt.textContent)||0)+1;
+        cnt.textContent=n||'';
+      }
+      const hrt=btn?.querySelector('.heart-icon');
+      if(hrt) hrt.textContent=liked?'🤍':'❤️';
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── openShareModal ── */
   window.openShareModal=function(type){
     const modal=document.getElementById('share-modal'); if(!modal) return;
     const t=type||'journal';
     document.getElementById('share-modal-title').textContent=`↗ Share ${t.charAt(0).toUpperCase()+t.slice(1)}`;
     let bodyHtml='';
+
     if(t==='journal'){
-      bodyHtml=`<div class="form-group"><label class="form-label">Title</label><input type="text" class="comm-form-input" id="sm-title" placeholder="Entry title..."></div><div class="form-group"><label class="form-label">Content</label><textarea class="comm-form-textarea" id="sm-body" placeholder="What happened, what you felt…" style="min-height:140px"></textarea></div><div class="form-group"><label class="form-label">Mood Emoji <span style="opacity:.5">(optional)</span></label><input type="text" class="comm-form-input" id="sm-mood" placeholder="😊 🌧 🔥" style="max-width:120px"></div><div class="form-group"><label class="form-label">Tags <span style="opacity:.5">(comma separated)</span></label><input type="text" class="comm-form-input" id="sm-tags" placeholder="work, school, growth"></div>`;
+      bodyHtml=`
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input type="text" class="comm-form-input" id="sm-title" placeholder="Entry title...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Content</label>
+          <textarea class="comm-form-textarea" id="sm-body"
+                    placeholder="What happened, what you felt…" style="min-height:140px"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mood Emoji <span style="opacity:.5">(optional)</span></label>
+          <input type="text" class="comm-form-input" id="sm-mood" placeholder="😊 🌧 🔥" style="max-width:120px">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags <span style="opacity:.5">(comma separated)</span></label>
+          <input type="text" class="comm-form-input" id="sm-tags" placeholder="work, school, growth">
+        </div>`;
+
     } else if(t==='task'){
-      bodyHtml=`<div class="form-group"><label class="form-label">Task Title</label><input type="text" class="comm-form-input" id="sm-title" placeholder="What did you accomplish?"></div><div class="form-group"><label class="form-label">Details <span style="opacity:.5">(optional)</span></label><textarea class="comm-form-textarea" id="sm-body" placeholder="More context…" style="min-height:90px"></textarea></div><div class="form-group"><label class="form-label">Priority</label><select class="comm-form-input" id="sm-priority"><option value="low">🟢 Low</option><option value="medium" selected>🟡 Medium</option><option value="high">🔴 High</option></select></div><div class="form-group" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="sm-done" style="width:16px;height:16px"><label for="sm-done" style="font-size:.85rem;cursor:pointer">Mark as completed</label></div>`;
+      bodyHtml=`
+        <div class="form-group">
+          <label class="form-label">Task Title</label>
+          <input type="text" class="comm-form-input" id="sm-title" placeholder="What did you accomplish?">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Details <span style="opacity:.5">(optional)</span></label>
+          <textarea class="comm-form-textarea" id="sm-body"
+                    placeholder="More context…" style="min-height:90px"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select class="comm-form-input" id="sm-priority">
+            <option value="low">🟢 Low</option>
+            <option value="medium" selected>🟡 Medium</option>
+            <option value="high">🔴 High</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="sm-done" style="width:16px;height:16px">
+          <label for="sm-done" style="font-size:.85rem;cursor:pointer">Mark as completed</label>
+        </div>`;
+
     } else if(t==='goal'){
-      bodyHtml=`<div class="form-group"><label class="form-label">Goal Title</label><input type="text" class="comm-form-input" id="sm-title" placeholder="What are you working towards?"></div><div class="form-group"><label class="form-label">Description <span style="opacity:.5">(optional)</span></label><textarea class="comm-form-textarea" id="sm-body" placeholder="Why this goal matters…" style="min-height:90px"></textarea></div><div class="form-group"><label class="form-label">Progress (0–100%)</label><input type="range" id="sm-progress" min="0" max="100" value="0" oninput="document.getElementById('sm-progress-val').textContent=this.value+'%'" style="width:100%"><span id="sm-progress-val" style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--accent)">0%</span></div><div class="form-group"><label class="form-label">Category</label><select class="comm-form-input" id="sm-category"><option value="health">💪 Health</option><option value="learn">📚 Learning</option><option value="finance">💰 Finance</option><option value="career">💼 Career</option><option value="personal" selected>🌱 Personal</option></select></div>`;
+      bodyHtml=`
+        <div class="form-group">
+          <label class="form-label">Goal Title</label>
+          <input type="text" class="comm-form-input" id="sm-title" placeholder="What are you working towards?">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description <span style="opacity:.5">(optional)</span></label>
+          <textarea class="comm-form-textarea" id="sm-body"
+                    placeholder="Why this goal matters…" style="min-height:90px"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Progress (0–100%)</label>
+          <input type="range" id="sm-progress" min="0" max="100" value="0"
+                 oninput="document.getElementById('sm-progress-val').textContent=this.value+'%'"
+                 style="width:100%">
+          <span id="sm-progress-val"
+                style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--accent)">0%</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="comm-form-input" id="sm-category">
+            <option value="health">💪 Health</option>
+            <option value="learn">📚 Learning</option>
+            <option value="finance">💰 Finance</option>
+            <option value="career">💼 Career</option>
+            <option value="personal" selected>🌱 Personal</option>
+          </select>
+        </div>`;
     }
-    bodyHtml+=`<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px"><button class="btn" onclick="closeShareModal()">Cancel</button><button class="btn btn-primary" onclick="submitShare('${t}')">Share ↗</button></div>`;
+
+    bodyHtml+=`
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+        <button class="btn" onclick="closeShareModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitShare('${t}')">Share ↗</button>
+      </div>`;
+
     document.getElementById('share-modal-body').innerHTML=bodyHtml;
     modal.classList.add('open');
   };
 
-  window.closeShareModal=function(){ document.getElementById('share-modal')?.classList.remove('open'); };
+  /* ── closeShareModal ── */
+  window.closeShareModal=function(){
+    document.getElementById('share-modal')?.classList.remove('open');
+  };
 
+  /* ── submitShare ── */
   window.submitShare=async function(type){
     const cu=window.currentUser; if(!cu) return;
     const p=window.userProfile||{};
@@ -498,44 +664,200 @@
     const title=document.getElementById('sm-title')?.value.trim()||'';
     const body=document.getElementById('sm-body')?.value.trim()||'';
     if(!title&&!body){ window.toast?.('Add some content first!','⚠️'); return; }
-    const post={type,title,body,authorId:cu.uid,authorName,authorAvatar,
+
+    const post={
+      type,title,body,authorId:cu.uid,authorName,authorAvatar,
       authorUsername:p.username||(authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user'),
-      likes:[],commentCount:0,repostCount:0};
-    if(type==='journal'){ post.moodEmoji=document.getElementById('sm-mood')?.value.trim()||''; post.tags=(document.getElementById('sm-tags')?.value||'').split(',').map(t=>t.trim()).filter(Boolean); }
-    if(type==='task'){ const pri=document.getElementById('sm-priority')?.value||'medium'; const icons={low:'🟢',medium:'🟡',high:'🔴'}; post.priority=pri; post.priorityIcon=icons[pri]||'✅'; post.done=document.getElementById('sm-done')?.checked||false; }
-    if(type==='goal'){ const cat=document.getElementById('sm-category')?.value||'personal'; const icons={health:'💪',learn:'📚',finance:'💰',career:'💼',personal:'🌱',other:'⭐'}; post.progress=parseInt(document.getElementById('sm-progress')?.value)||0; post.category=cat; post.categoryIcon=icons[cat]||'🎯'; }
+      likes:[],commentCount:0,repostCount:0
+    };
+
+    if(type==='journal'){
+      post.moodEmoji=document.getElementById('sm-mood')?.value.trim()||'';
+      post.tags=(document.getElementById('sm-tags')?.value||'').split(',').map(t=>t.trim()).filter(Boolean);
+    }
+    if(type==='task'){
+      const pri=document.getElementById('sm-priority')?.value||'medium';
+      const icons={low:'🟢',medium:'🟡',high:'🔴'};
+      post.priority=pri; post.priorityIcon=icons[pri]||'✅';
+      post.done=document.getElementById('sm-done')?.checked||false;
+    }
+    if(type==='goal'){
+      const cat=document.getElementById('sm-category')?.value||'personal';
+      const icons={health:'💪',learn:'📚',finance:'💰',career:'💼',personal:'🌱',other:'⭐'};
+      post.progress=parseInt(document.getElementById('sm-progress')?.value)||0;
+      post.category=cat; post.categoryIcon=icons[cat]||'🎯';
+    }
+
     try{
       const{addDoc,collection,serverTimestamp}=window._fbFS;
       post.createdAt=serverTimestamp();
       await addDoc(collection(window.db,'community_posts'),post);
-      closeShareModal(); window.toast?.('Shared! ✨','🌐');
+      closeShareModal();
+      window.toast?.('Shared! ✨','🌐');
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
+  /* ── keyboard shortcuts ── */
   document.addEventListener('keydown',e=>{
     if(e.key!=='Escape') return;
-    const upm=document.getElementById('upm-overlay');
-    if(upm&&upm.style.display!=='none'&&upm.style.display!=='') { window.closeUserProfileModal(); return; }
-    if(document.getElementById('post-expand-overlay-comm')?.classList.contains('open')) { closeExpandedPost(); return; }
-    if(document.getElementById('share-modal')?.classList.contains('open')) { closeShareModal(); }
+    if(document.getElementById('post-expand-overlay-comm')?.classList.contains('open')){
+      closeExpandedPost(); return;
+    }
+    if(document.getElementById('share-modal')?.classList.contains('open')){
+      closeShareModal();
+    }
   });
 
-  waitForFirebase(()=>{
-    const unsub=window.auth.onAuthStateChanged(user=>{
-      if(!user) return;
-      window.currentUser=user;
-      const{collection,query,orderBy,onSnapshot}=window._fbFS;
-      onSnapshot(
-        query(collection(window.db,'community_posts'),orderBy('createdAt','desc')),
-        snap=>{
-          window.feedPosts=snap.docs.map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate()}));
-          window.renderFeed();
-          if(typeof window.renderProfilePage==='function') window.renderProfilePage();
-        },
-        err=>console.error('Feed error:',err.message)
-      );
-      unsub();
+  /* ── OVERRIDE renderPostCard ───────────────────────────────
+     app.js's renderPostCard does not put onclick on the card.
+     It relies on initExpandableCards delegation, which mis-routes
+     journal-type community posts to openExpandedJournal().
+     
+     We override window.renderPostCard here so every card gets
+     onclick="window.openExpandedPost(id)" directly on the root
+     div. This bypasses delegation entirely — no routing bugs.
+     
+     We also override window.renderFeed so it calls our version.
+  ────────────────────────────────────────────────────────── */
+  function _communityRenderPostCard(p){
+    if(!window.currentUser) return '';
+    const cu=window.currentUser;
+    const isOwn=p.authorId===cu.uid, liked=(p.likes||[]).includes(cu.uid);
+    const timeAgo=relativeTime(p.createdAt), bc=TYPE_BADGE_CLASS[p.type]||'badge-journal';
+    const handle=getHandle(p), pid=p.id;
+
+    const repost=p.isRepost
+      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(p.originalAuthorAvatar||'')}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"> <span>${esc(p.originalAuthorName||'')}</span></div>` : '';
+
+    let body='';
+    if(p.type==='goal'){
+      body=`<div class="post-goal-bar"><div class="post-goal-fill" style="width:${p.progress||0}%"></div></div>
+        <div class="post-goal-meta"><span>${p.categoryIcon||'🎯'}</span><span>${p.progress||0}% complete</span></div>
+        ${p.body?`<div class="post-body">${esc(p.body)}</div>`:''}`;
+    } else if(p.type==='task'){
+      body=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span>${p.priorityIcon||'✅'}</span>
+          <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase">${p.priority||''} priority</span>
+          ${p.done?`<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--green)">· Done ✓</span>`:''}
+        </div>
+        ${p.body?`<div class="post-body">${esc(p.body)}</div>`:''}`;
+    } else {
+      const long=(p.body||'').length>300;
+      body=`<div class="post-body" id="post-body-${pid}"${long?' style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden"':''}>${esc(p.body||'')}</div>
+        ${long?`<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${pid}')">Read more ↓</span>`:''}
+        ${p.moodEmoji?`<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`:''}
+        ${p.photoUrls?.length?`<div class="post-photos" onclick="event.stopPropagation()">${p.photoUrls.map(u=>`<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`:''}
+        ${p.tags?.length?`<div class="post-tags" onclick="event.stopPropagation()">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`:''}`;
+    }
+
+    // onclick is on the whole card. Action buttons stop propagation inline.
+    return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}"
+        onclick="(function(e){if(!e.target.closest('.post-action-btn,.post-delete-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')){window.openExpandedPost('${pid}')};})(event)"
+        style="cursor:pointer">
+      <div class="post-header">
+        <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+        <div class="post-meta">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <button class="post-author-btn" onclick="event.stopPropagation();openUserProfileModal('${p.authorId}')">
+              <span class="post-author-name">${esc(p.authorName||'Anonymous')}</span>
+              <span class="post-author-username">@${esc(handle)}</span>
+            </button>
+            <span class="post-type-badge ${bc}">${TYPE_BADGES[p.type]||p.type}</span>
+            ${isOwn?`<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>`:''}
+          </div>
+          <div class="post-time">${timeAgo}</div>
+        </div>
+        ${isOwn?`<button class="post-delete-btn" onclick="event.stopPropagation();deletePost('${pid}')">🗑️</button>`:''}
+      </div>
+      ${p.title?`<div class="post-title">${esc(p.title)}</div>`:''}
+      ${repost}${body}
+      <div class="post-actions">
+        <button class="post-action-btn ${liked?'liked':''}" onclick="event.stopPropagation();toggleLike('${pid}')">
+          <span class="heart-icon">${liked?'❤️':'🤍'}</span>
+          <span class="post-action-count">${(p.likes||[]).length||''}</span>
+        </button>
+        <button class="post-action-btn" onclick="event.stopPropagation();window.openExpandedPost('${pid}')">
+          💬 <span class="post-action-count" id="comment-count-${pid}">${p.commentCount||0}</span>
+        </button>
+        <button class="post-action-btn" onclick="event.stopPropagation();repost('${pid}')">
+          🔁 <span class="post-action-count">${p.repostCount||''}</span>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  function _communityRenderFeed(){
+    const feedList=document.getElementById('feed-list'); if(!feedList) return;
+    if(!Array.isArray(window.feedPosts)){
+      if(typeof showSkeleton==='function')
+        showSkeleton(feedList,5,'<div class="post-card" style="height:120px;margin:8px 0;opacity:.4"></div>');
+      return;
+    }
+    const cu=window.currentUser;
+    let posts=[...window.feedPosts];
+    if(_currentFilter==='mine') posts=posts.filter(p=>p.authorId===cu?.uid);
+    else if(_currentFilter!=='all') posts=posts.filter(p=>p.type===_currentFilter);
+    if(!posts.length){
+      feedList.innerHTML=`<div class="feed-empty"><div class="empty-icon">🌱</div><div class="empty-title">Nothing here yet</div><div class="empty-sub">Be the first to share something!</div></div>`;
+      return;
+    }
+    feedList.innerHTML=posts.map(p=>_communityRenderPostCard(p)).join('');
+    // Update stats
+    const all=window.feedPosts;
+    const $=id=>document.getElementById(id);
+    if($('comm-stat-posts'))   $('comm-stat-posts').textContent=all.length;
+    if($('comm-stat-likes'))   $('comm-stat-likes').textContent=all.reduce((s,p)=>s+(p.likes?.length||0),0);
+    if($('comm-stat-members')) $('comm-stat-members').textContent=new Set(all.map(p=>p.authorId)).size;
+  }
+
+  // Install overrides — do it now and retry to survive load-order races
+  function _installOverrides(){
+    window.renderPostCard = _communityRenderPostCard;
+    window.renderFeed     = _communityRenderFeed;
+  }
+  _installOverrides();
+  setTimeout(_installOverrides, 0);
+  setTimeout(_installOverrides, 300);
+  setTimeout(_installOverrides, 800);
+
+  /* ── MutationObserver: patch cards after ANY render ───────
+     app.js's renderFeed() is module-scoped and always fires,
+     overwriting our cards. Instead of fighting it, we watch
+     #feed-list with a MutationObserver and immediately add
+     onclick to every .post-card that doesn't have one.
+     This runs after every render regardless of who triggered it.
+  ────────────────────────────────────────────────────────── */
+  function _patchCards(root){
+    (root||document).querySelectorAll('.post-card[data-post-id]').forEach(card=>{
+      const pid=card.getAttribute('data-post-id');
+      if(!pid) return;
+      // Already patched this card
+      if(card.dataset.clickPatched==='1') return;
+      card.dataset.clickPatched='1';
+      card.style.cursor='pointer';
+      card.addEventListener('click',function(e){
+        // Ignore clicks on action buttons, author button, photos, tags, read-more
+        if(e.target.closest('.post-action-btn,.post-delete-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')) return;
+        if(typeof window.openExpandedPost==='function') window.openExpandedPost(pid);
+      });
     });
-  });
+  }
+
+  function _startObserver(){
+    const feedList=document.getElementById('feed-list');
+    if(!feedList) return;
+    _patchCards(feedList); // patch existing cards immediately
+    new MutationObserver(()=>_patchCards(feedList))
+      .observe(feedList,{childList:true,subtree:true});
+  }
+
+  // Start observer as soon as DOM is ready
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',_startObserver);
+  } else {
+    _startObserver();
+    setTimeout(_startObserver,200); // retry in case feed-list not yet in DOM
+  }
+
 })();
 </script>

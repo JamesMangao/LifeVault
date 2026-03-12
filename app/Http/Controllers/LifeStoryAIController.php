@@ -5,34 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-
-/**
- * ============================================================
- *  LifeStoryAIController — Powered by OpenRouter (Auto Free)
- * ============================================================
- *
- *  Route : POST /ai/life-story/generate  (web.php)
- *  Named : ai.life-story.generate
- *
- *  SETUP
- *  ─────────────────────────────────────────────────────────
- *  1. Get free API key: https://openrouter.ai/keys
- *
- *  2. Add to .env:
- *       OPENROUTER_API_KEY=sk-or-v1-your_key_here
- *
- *  3. Add to config/services.php inside the return array:
- *       'openrouter' => [
- *           'key' => env('OPENROUTER_API_KEY'),
- *       ],
- *
- *  4. php artisan config:clear
- *
- *  NOTE: Uses "openrouter/free" — OpenRouter automatically picks
- *  the best available free model for each request. No model
- *  selection needed from the user.
- * ============================================================
- */
 class LifeStoryAIController extends Controller
 {
     // Hardcoded — OpenRouter auto-selects the best free model
