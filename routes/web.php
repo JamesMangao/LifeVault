@@ -29,3 +29,18 @@ Route::post('/ai/shadow-self/analyze', [ShadowSelfAIController::class, 'analyzeS
 
 Route::post('/ai/holistic-career/analyze', [HolisticCareerAdvisorController::class, 'analyze'])
      ->name('ai.holistic-career.analyze');
+
+// ── AI Chat API ──────────────────────────────────────────────
+Route::post('/api/chat', function (\Illuminate\Http\Request $request) {
+    $response = \Illuminate\Support\Facades\Http::withHeaders([
+        'Authorization' => 'Bearer ' . env('OPENROUTER_API_KEY'),
+        'HTTP-Referer'  => config('app.url'),
+        'X-Title'       => 'LifeVault',
+    ])->post('https://openrouter.ai/api/v1/chat/completions', $request->all());
+
+    return $response->json();
+})->middleware('web');
+
+Route::get('/insights', function () {
+    return view('insights');
+})->name('insights');

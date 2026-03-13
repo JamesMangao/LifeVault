@@ -269,9 +269,19 @@ async function loadAll() {
     tasks    = t.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
     goals    = g.docs.map(d => ({id:d.id,...d.data(), createdAt:d.data().createdAt?.toDate()}));
 
-    window.journals = journals;
-    window.tasks = tasks;
-    window.goals = goals;
+
+window.journals = journals;
+window.tasks = tasks;
+window.goals = goals;
+
+// Expose data for Insights page (exact names required)
+window.journalEntries = journals;
+window.tasks = tasks;
+window.goals = goals;
+
+// Trigger insights re-render
+window.dispatchEvent(new Event('insightsRefresh'));
+
 
     subscribeFeed();
     renderAll();
@@ -742,7 +752,7 @@ function initExpandableCards(container) {
     const userBtn = e.target.closest('[data-user]');
     if (userBtn) { e.stopPropagation(); openUserProfileModal(userBtn.dataset.user); return; }
 
-    const entryEl = e.target.closest('.journal-entry, .post-card');
+const entryEl = e.target.closest('.journal-entry, .post-card');
     if (entryEl) {
       if (entryEl.classList.contains('journal-entry')) {
         const jid = entryEl.dataset.id || entryEl.dataset.journalId;
@@ -753,8 +763,16 @@ function initExpandableCards(container) {
       } else if (entryEl.classList.contains('post-card')) {
         const postId = entryEl.getAttribute('data-expand') || entryEl.getAttribute('data-post-id');
         if (postId) {
-          // if the post itself is a shared journal entry, open the journal overlay
+          const isCommunityPage = document.getElementById('page-community')?.classList.contains('active');
           const postObj = window.feedPosts?.find(p=>p.id===postId);
+          
+          // Community page: always use community post overlay (fixes journal/task/goal routing)
+          if (isCommunityPage && typeof window.openExpandedPost === 'function') {
+            window.openExpandedPost(postId);
+            return;
+          }
+          
+          // Legacy: journal-type posts → journal overlay (non-community pages)
           if (postObj && postObj.type==='journal' && typeof window.openExpandedJournal === 'function') {
             window.openExpandedJournal(postId);
           } else {
@@ -1339,11 +1357,17 @@ window.setComposerType = type => {
 window.postThought = async () => {
   const text = document.getElementById('composer-text').value.trim();
   if (!text) { toast('Write something first!','✍️'); return; }
+  const cu = window.currentUser;
+  if (!cu) return;
+  const p = window.userProfile || {};
+  // FIXED: Prioritize freshest profile data to prevent stale name/pic in new posts
+  const authorName = p.displayName || cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   try {
     await addDoc(collection(db,'community_posts'), {
       type:'thought', body:text, title:'',
-      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
-      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      authorId:cu.uid, authorName, authorAvatar,
+      authorUsername:p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user'),
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
     document.getElementById('composer-text').value = '';
@@ -1399,13 +1423,17 @@ window.openShareModal = (type = 'journal') => {
 window.shareJournal = async id => {
   if (!currentUser) { toast('Please wait, user not ready.','⏳'); return; }
   const e = journals.find(j=>j.id===id); if (!e) return;
+  const cu = window.currentUser;
+  const p = window.userProfile || {};
+  const authorName = p.displayName || cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   try {
     await addDoc(collection(db,'community_posts'), {
       type:'journal', title:e.title||'Untitled', body:e.content||'', mood:e.mood||3,
       moodEmoji:e.moodEmoji||'😐', tags:e.tags||[], photoUrls:(e.photoUrls||[]).slice(0,3),
-      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
-      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      authorId:cu.uid, authorName, authorAvatar,
+      authorUsername:p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user'),
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
     toast('Journal shared! 🌐','📓'); navigateTo('community');
@@ -1414,13 +1442,17 @@ window.shareJournal = async id => {
 
 window.shareTask = async id => {
   const t = tasks.find(t=>t.id===id); if (!t) return;
+  const cu = window.currentUser;
+  const p = window.userProfile || {};
+  const authorName = p.displayName || cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   const PI = {high:'🔴',med:'🟡',low:'🟢'};
   try {
     await addDoc(collection(db,'community_posts'), {
       type:'task', title:t.text, body:t.note||'', priority:t.priority, priorityIcon:PI[t.priority]||'✅', done:t.done||false,
-      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
-      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      authorId:cu.uid, authorName, authorAvatar,
+      authorUsername:p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user'),
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
     toast('Task shared! 🌐','✅'); navigateTo('community');
@@ -1429,12 +1461,16 @@ window.shareTask = async id => {
 
 window.shareGoal = async id => {
   const g = goals.find(g=>g.id===id); if (!g) return;
+  const cu = window.currentUser;
+  const p = window.userProfile || {};
+  const authorName = p.displayName || cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   try {
     await addDoc(collection(db,'community_posts'), {
       type:'goal', title:g.name, body:g.target||'', category:g.category, categoryIcon:CAT_ICONS[g.category]||'⭐', progress:g.progress||0,
-      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
-      authorAvatar:currentUser.photoURL||`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName||'U')}&background=4f8ef7&color=fff`,
+      authorId:cu.uid, authorName, authorAvatar,
+      authorUsername:p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user'),
       likes:[], commentCount:0, createdAt:serverTimestamp()
     });
     toast('Goal shared! 🌐','🎯'); navigateTo('community');
@@ -1599,12 +1635,16 @@ window.deleteComment = async (postId, commentId) => {
 window.repost = async postId => {
   const post = feedPosts.find(p=>p.id===postId); if (!post) return;
   if (post.authorId === currentUser.uid) { toast('Cannot repost your own post','⚠️'); return; }
+  const cu = window.currentUser;
+  const p = window.userProfile || {};
+  const authorName = p.displayName || cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   try {
     await addDoc(collection(db,'community_posts'), {
       ...post, id:undefined, isRepost:true,
       originalAuthorName:post.authorName, originalAuthorAvatar:post.authorAvatar,
-      authorId:currentUser.uid, authorName:currentUser.displayName||'Anonymous',
-      authorAvatar:currentUser.photoURL||'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff',
+      authorId:cu.uid, authorName, authorAvatar,
+      authorUsername:p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user'),
       likes:[], commentCount:0, repostCount:0, createdAt:serverTimestamp()
     });
     await updateDoc(doc(db,'community_posts',postId), {repostCount:increment(1)});

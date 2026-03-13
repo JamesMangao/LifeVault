@@ -102,31 +102,42 @@
       <button class="modal-close" onclick="closeModal('edit-profile-modal')">&times;</button>
     </div>
     <div class="modal-body">
-      <form id="edit-profile-form">
-        <div class="form-group">
-          <label for="edit-fullname">Full Name</label>
-          <input type="text" id="edit-fullname" class="form-control" required>
-        </div>
-        <div class="form-group">
-          <label for="edit-username">Username</label>
-          <input type="text" id="edit-username" class="form-control" required pattern="^[a-z0-9_]{3,20}$">
-          <small>3-20 characters, lowercase letters, numbers, and underscores only.</small>
-        </div>
-        <div class="form-group">
-          <label for="edit-bio">Bio</label>
-          <textarea id="edit-bio" class="form-control" rows="3" maxlength="160"></textarea>
-        </div>
-        <div class="form-group">
-          <label for="edit-location">Location</label>
-          <input type="text" id="edit-location" class="form-control">
-        </div>
-        <div class="form-group">
-          <label for="edit-website">Website</label>
-          <input type="url" id="edit-website" class="form-control" placeholder="https://">
-        </div>
-      </form>
+
+      <div class="form-group">
+        <label class="form-label" for="edit-fullname">Full Name</label>
+        <input type="text" id="edit-fullname" class="form-input" placeholder="Your display name" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit-username">Username</label>
+        <input type="text" id="edit-username" class="form-input" placeholder="yourhandle"
+               pattern="^[a-z0-9_]{3,20}$" required>
+        <small style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);margin-top:5px;display:block">
+          3–20 characters · lowercase letters, numbers, underscores only
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit-bio">Bio</label>
+        <textarea id="edit-bio" class="form-textarea" rows="3" maxlength="160"
+                  placeholder="Tell the community a little about yourself…"></textarea>
+        <small style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);margin-top:5px;display:block">
+          Max 160 characters
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="edit-location">Location</label>
+        <input type="text" id="edit-location" class="form-input" placeholder="City, Country">
+      </div>
+
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="edit-website">Website</label>
+        <input type="url" id="edit-website" class="form-input" placeholder="https://yoursite.com">
+      </div>
+
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:20px;margin-top:20px;border-top:1px solid var(--border)">
       <button class="btn" onclick="closeModal('edit-profile-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
     </div>
@@ -284,10 +295,30 @@
 
       await _setUserProfile(profileData);
       window.userProfile = { ...window.userProfile, ...profileData };
+      
+      // FIXED: Refresh global app.js state + trigger re-renders to prevent stale snapshots in new posts
+      if (window.currentUser) {
+        window.currentUser.displayName = newName;
+        if (typeof window.applyProfileToUI === 'function') window.applyProfileToUI();
+        // Trigger auth listener refresh for persistence
+        window.auth?.currentUser?.reload();
+      }
+      
       applyProfileToUI();
       showToast('Profile updated successfully!');
       closeModal('edit-profile-modal');
       _syncProfileUpdateToPosts(newName, _currentAvatarUrl());
+
+      // Also update the Firebase Auth profile
+      const { updateProfile } = window._fbAU;
+      const cu = getCurrentUser();
+      if (cu) {
+        try {
+          await updateProfile(cu, { displayName: newName });
+        } catch (e) {
+          console.warn('Failed to update auth profile displayName', e.message);
+        }
+      }
     };
 
     /* ── Avatar ── */
@@ -339,6 +370,14 @@
       if (!selectedAvatar) return;
       await _setUserProfile({ avatarUrl: selectedAvatar });
       window.userProfile.avatarUrl = selectedAvatar;
+      
+      // FIXED: Refresh global state
+      if (window.currentUser && window.auth?.currentUser) {
+        window.currentUser.photoURL = selectedAvatar;
+        if (typeof window.applyProfileToUI === 'function') window.applyProfileToUI();
+        window.auth.currentUser.reload();
+      }
+      
       applyProfileToUI();
       showToast('Avatar updated!');
       closeModal('avatar-modal');
@@ -389,6 +428,18 @@
     /* ── Private helpers ── */
     function _currentAvatarUrl() {
       return window.userProfile?.avatarUrl || getCurrentUser()?.photoURL || '/img/avatars/default.png';
+    }
+
+    async function updateAuthPhotoURL(url) {
+      const { getAuth, updateProfile } = await import('//www.gstatic.com/firebasejs/9.6.10/firebase-auth.js');
+      const auth = getAuth();
+      if (auth.currentUser) {
+        try {
+          await updateProfile(auth.currentUser, { photoURL: url });
+        } catch (error) {
+          console.error("Error updating auth photo URL:", error);
+        }
+      }
     }
 
     async function _setUserProfile(data) {
@@ -513,4 +564,3 @@
     _patchNavigateTo();
   }
 })();
-</script>

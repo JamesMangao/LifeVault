@@ -1,5 +1,8 @@
 {{-- LIFEVAULT — community.blade.php (COMPLETE) --}}
 <style>
+  .lv-like-btn {
+  transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), color 0.15s !important;
+}
 :root{--bg:#0b0f1a;--surface:#111827;--surface2:#1a2235;--border:rgba(255,255,255,.07);--text:#e8eaf0;--muted:#6b7a99;--accent:#4f8ef7;--green:#34d399;--amber:#fbbf24;--rose:#f87171;--lavender:#a78bfa;--teal:#2dd4bf}
 @keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
@@ -156,7 +159,7 @@
       <button class="feed-filter-btn" onclick="filterFeed('goal',this)">🎯 Goals</button>
       <button class="feed-filter-btn" onclick="filterFeed('mine',this)">👤 Mine</button>
     </div>
-    <div id="feed-list"></div>
+<div id="feed-list" onclick="handleCommunityPostClick(event)"></div>
   </div>
 </div>
 
@@ -277,6 +280,48 @@
       const{updateDoc,doc,arrayUnion,arrayRemove}=window._fbFS;
       await updateDoc(doc(window.db,'community_posts',postId),{likes:liked?arrayRemove(cu.uid):arrayUnion(cu.uid)});
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
+  };
+
+  /* ── lvLike — optimistic like with animation, NO card expand ── */
+  window.lvLike = async function(e, btn, postId) {
+    e.stopPropagation();
+    e.preventDefault();
+    const cu = window.currentUser; if (!cu) return;
+    const post = (window.feedPosts || []).find(p => p.id === postId); if (!post) return;
+
+    const liked = (post.likes || []).includes(cu.uid);
+    const heart = btn.querySelector('.heart-icon');
+    const count = btn.querySelector('.lv-like-count');
+
+    // Optimistic UI update immediately
+    const newLiked = !liked;
+    btn.classList.toggle('liked', newLiked);
+    if (heart) heart.textContent = newLiked ? '❤️' : '🤍';
+    if (count) {
+      const n = parseInt(count.textContent) || 0;
+      count.textContent = newLiked ? (n + 1 || 1) : Math.max(0, n - 1) || '';
+    }
+
+    // Pulse animation
+    btn.style.transform = 'scale(1.3)';
+    setTimeout(() => { btn.style.transform = ''; }, 200);
+
+    // Firestore update
+    try {
+      const { updateDoc, doc, arrayUnion, arrayRemove } = window._fbFS;
+      await updateDoc(doc(window.db, 'community_posts', postId), {
+        likes: liked ? arrayRemove(cu.uid) : arrayUnion(cu.uid)
+      });
+    } catch (err) {
+      // Revert on failure
+      btn.classList.toggle('liked', liked);
+      if (heart) heart.textContent = liked ? '❤️' : '🤍';
+      if (count) {
+        const n = parseInt(count.textContent) || 0;
+        count.textContent = liked ? (n + 1 || 1) : Math.max(0, n - 1) || '';
+      }
+      window.toast?.('Error liking post', '❌');
+    }
   };
 
   /* ── toggleReadMore ── */
@@ -719,8 +764,13 @@
      
      We also override window.renderFeed so it calls our version.
   ────────────────────────────────────────────────────────── */
+  // PRIORITY OVERRIDE: 2024-12 timestamp beats app.js renders
+  window.renderPostCard = _communityRenderPostCard;
+  window.renderFeed     = _communityRenderFeed;
+  
   function _communityRenderPostCard(p){
     if(!window.currentUser) return '';
+
     const cu=window.currentUser;
     const isOwn=p.authorId===cu.uid, liked=(p.likes||[]).includes(cu.uid);
     const timeAgo=relativeTime(p.createdAt), bc=TYPE_BADGE_CLASS[p.type]||'badge-journal';
@@ -751,7 +801,7 @@
     }
 
     // onclick is on the whole card. Action buttons stop propagation inline.
-    return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}"
+return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}" style="cursor:pointer">
         onclick="(function(e){if(!e.target.closest('.post-action-btn,.post-delete-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')){window.openExpandedPost('${pid}')};})(event)"
         style="cursor:pointer">
       <div class="post-header">
@@ -772,9 +822,11 @@
       ${p.title?`<div class="post-title">${esc(p.title)}</div>`:''}
       ${repost}${body}
       <div class="post-actions">
-        <button class="post-action-btn ${liked?'liked':''}" onclick="event.stopPropagation();toggleLike('${pid}')">
+        <button class="post-action-btn lv-like-btn ${liked?'liked':''}"
+                data-pid="${pid}"
+                onclick="event.stopPropagation();event.preventDefault();lvLike(event,this,'${pid}')">
           <span class="heart-icon">${liked?'❤️':'🤍'}</span>
-          <span class="post-action-count">${(p.likes||[]).length||''}</span>
+          <span class="post-action-count lv-like-count">${(p.likes||[]).length||''}</span>
         </button>
         <button class="post-action-btn" onclick="event.stopPropagation();window.openExpandedPost('${pid}')">
           💬 <span class="post-action-count" id="comment-count-${pid}">${p.commentCount||0}</span>
@@ -843,11 +895,32 @@
     });
   }
 
+  // COMMUNITY FALLBACK: explicit delegation (belt + suspenders)
+  window.handleCommunityPostClick = function(e) {
+    const postCard = e.target.closest('.post-card[data-post-id]');
+    if (!postCard) return;
+    
+    // Ignore clicks on buttons/links/photos
+    if (e.target.closest('.post-action-btn,.post-delete-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags,.post-photo')) {
+      return;
+    }
+    
+    const postId = postCard.getAttribute('data-post-id');
+    if (postId && typeof window.openExpandedPost === 'function') {
+      e.stopPropagation();
+      window.openExpandedPost(postId);
+    }
+  };
+
   function _startObserver(){
     const feedList=document.getElementById('feed-list');
     if(!feedList) return;
     _patchCards(feedList); // patch existing cards immediately
-    new MutationObserver(()=>_patchCards(feedList))
+    new MutationObserver(function(mutations){
+      _patchCards(feedList);
+      // Re-attach delegation after DOM changes
+      feedList.onclick = window.handleCommunityPostClick;
+    })
       .observe(feedList,{childList:true,subtree:true});
   }
 
@@ -855,7 +928,7 @@
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',_startObserver);
   } else {
-    _startObserver();
+  _startObserver();\n\n
     setTimeout(_startObserver,200); // retry in case feed-list not yet in DOM
   }
 

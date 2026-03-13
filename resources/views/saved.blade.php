@@ -144,17 +144,17 @@
 
 .saved-tab:hover { border-color:var(--accent)!important; color:var(--accent)!important; }
 
-.saved-item {
+.saved {
   break-inside:avoid; margin-bottom:16px;
   background:var(--surface); border-radius:16px; border:1px solid var(--border);
   overflow:hidden; animation:saved-in .28s cubic-bezier(.4,0,.2,1) both;
   transition:transform .2s,box-shadow .2s,border-color .2s; cursor:pointer;
 }
-.saved-item:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(0,0,0,.32); }
+.saved:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(0,0,0,.32); }
 
-.saved-item-header { display:flex;align-items:center;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--border); }
-.saved-item-body   { padding:16px 18px; }
-.saved-item-footer { display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:rgba(255,255,255,.015); }
+.saved-header { display:flex;align-items:center;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--border); }
+.saved-body   { padding:16px 18px; }
+.saved-footer { display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:rgba(255,255,255,.015); }
 
 .saved-type-badge { font-family:'JetBrains Mono',monospace;font-size:.54rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:3px 9px;border-radius:99px; }
 .saved-score-pill { display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700; }
@@ -232,7 +232,7 @@ window.savedClearAll = function(){
 };
 window.savedDeleteItem = function(id){
   persistItems(loadItems().filter(function(i){ return i.id !== id; }));
-  var el = document.getElementById('saved-item-' + id);
+  var el = document.getElementById('saved-' + id);
   if(el){
     el.style.transition = 'opacity .2s,transform .2s';
     el.style.opacity    = '0';
@@ -454,21 +454,21 @@ function buildResumeCard(item){
   var lbl = ok?'Strong Match':mid?'Moderate Match':'Needs Work';
   var preview = (item.markdown||'').replace(/#{1,3} .+\n?/g,'').replace(/\*\*/g,'').replace(/\*/g,'').trim().slice(0,220);
 
-  return '<div class="saved-item" id="saved-item-'+item.id+'" style="border-color:rgba(79,142,247,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-item-header">'
+  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(79,142,247,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
+    +'<div class="saved-header">'
     +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📄</div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(item.title||'Resume Analysis')+'</div>'
     +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+esc(item.subtitle||'')+' · '+relTime(item.savedAt)+'</div></div>'
     +'<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">Resume</span>'
     +'</div>'
-    +'<div class="saved-item-body">'
+    +'<div class="saved-body">'
     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<span class="saved-score-pill" style="background:'+sb+';border:1px solid '+sr+';color:'+sc+'"><span style="font-size:.8rem;font-weight:900">'+s+'</span><span style="opacity:.6">/100</span></span>'
     +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:'+sc+';text-transform:uppercase;letter-spacing:.08em">'+lbl+'</span>'
     +'</div>'
     +(preview?'<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'…</div>':'')
     +'</div>'
-    +'<div class="saved-item-footer" onclick="event.stopPropagation()">'
+    +'<div class="saved-footer" onclick="event.stopPropagation()">'
     +viewBtn(item.id,'View Report')
     +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
     +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
@@ -485,20 +485,20 @@ function buildStoryCard(item){
     return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:2px 8px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender);text-transform:uppercase;letter-spacing:.06em">'+esc(t)+'</span>';
   }).join('');
 
-  return '<div class="saved-item" id="saved-item-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-item-header">'
+  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
+    +'<div class="saved-header">'
     +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📖</div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic">"'+esc(item.title||'My Life Story')+'"</div>'
     +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+(SM[item.style]||item.style||'')+' · '+(RL[item.range]||'')+' · '+relTime(item.savedAt)+'</div></div>'
     +'<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender)">Story</span>'
     +'</div>'
-    +'<div class="saved-item-body">'
+    +'<div class="saved-body">'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
     +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">'+wc+' words</span>'+themes
     +'</div>'
     +'<div style="font-family:\'Newsreader\',serif;font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+(preview.length>=240?'…':'')+'</div>'
     +'</div>'
-    +'<div class="saved-item-footer" onclick="event.stopPropagation()">'
+    +'<div class="saved-footer" onclick="event.stopPropagation()">'
     +viewBtn(item.id,'Read Full Story')
     +'<button onclick="event.stopPropagation();savedCopyStory(\''+item.id+'\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.25);color:var(--lavender)">📋 Copy</button>'
     +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
@@ -518,14 +518,14 @@ function buildShadowCard(item){
     return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:3px 9px;border-radius:99px;background:'+b+';color:'+c+';border:1px solid '+r+';text-transform:uppercase;letter-spacing:.05em">'+esc(p.emoji||'')+' '+esc(p.name||'')+'</span>';
   }).join('');
 
-  return '<div class="saved-item" id="saved-item-'+item.id+'" style="border-color:rgba(248,113,113,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-item-header">'
+  return '<div class="saved"saved-'+item.id+'" style="border-color:rgba(248,113,113,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
+    +'<div class="saved-header">'
     +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🪞</div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text)">'+esc(item.summaryTitle||'Shadow Analysis')+'</div>'
     +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+patterns.length+' patterns · '+relTime(item.savedAt)+'</div></div>'
     +'<span class="saved-type-badge" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--rose)">Shadow</span>'
     +'</div>'
-    +'<div class="saved-item-body">'
+    +'<div class="saved">'
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
     +'<div style="text-align:center;flex-shrink:0">'
     +'<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">'+score+'%</div>'
@@ -534,7 +534,7 @@ function buildShadowCard(item){
     +'</div>'
     +'<div style="display:flex;gap:5px;flex-wrap:wrap">'+badges+'</div>'
     +'</div>'
-    +'<div class="saved-item-footer" onclick="event.stopPropagation()">'
+    +'<div class="saved-footer" onclick="event.stopPropagation()">'
     +viewBtn(item.id,'View Analysis')
     +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
     +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
@@ -550,21 +550,21 @@ function buildHolisticCard(item){
                :{color:'var(--rose)',bg:'rgba(248,113,113,.1)',br:'rgba(248,113,113,.3)',lbl:'Misaligned'};
   var preview = (item.content||'').replace(/#{1,3} .+\n?/g,'').replace(/\*\*/g,'').replace(/\*/g,'').trim().slice(0,240);
 
-  return '<div class="saved-item" id="saved-item-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-item-header">'
+  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
+    +'<div class="saved-header">'
     +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔮</div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(item.title||'Holistic Career Report')+'</div>'
     +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+relTime(item.savedAt)+'</div></div>'
     +'<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--accent)">Career</span>'
     +'</div>'
-    +'<div class="saved-item-body">'
+    +'<div class="saved-body">'
     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<span class="saved-score-pill" style="background:'+m.bg+';border:1px solid '+m.br+';color:'+m.color+'"><span style="font-size:.8rem;font-weight:900">'+s+'</span><span style="opacity:.6">/100</span></span>'
     +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:'+m.color+';text-transform:uppercase;letter-spacing:.08em">'+m.lbl+'</span>'
     +'</div>'
     +(preview?'<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'…</div>':'')
     +'</div>'
-    +'<div class="saved-item-footer" onclick="event.stopPropagation()">'
+    +'<div class="saved-footer" onclick="event.stopPropagation()">'
     +viewBtn(item.id,'View Report')
     +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
     +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
@@ -595,37 +595,110 @@ function updateCounts(items){
 function recheckEmpty(){
   var grid=document.getElementById('saved-grid'), empty=document.getElementById('saved-empty');
   if(!grid) return;
-  if(!grid.querySelectorAll('.saved-item').length){ grid.style.display='none'; empty.style.display='block'; }
+  if(!grid.querySelectorAll('.saved').length){ grid.style.display='none'; empty.style.display='block'; }
 }
 
 /* ── Render ──────────────────────────────────────────────── */
 function renderSaved(){
-  var all=loadItems(), grid=document.getElementById('saved-grid'), empty=document.getElementById('saved-empty');
-  if(!grid) return;
+  var all = loadItems();
+  var grid  = document.getElementById('saved-grid');
+  var empty = document.getElementById('saved-empty');
+  if(!grid || !empty) return;
+
   updateCounts(all);
-  var filtered=all.filter(function(item){
-    if(activeTab!=='all' && item.type!==activeTab) return false;
+
+  var filtered = all.filter(function(item){
+    if(activeTab !== 'all' && item.type !== activeTab) return false;
     if(searchQuery){
-      var hay=[item.title||'',item.subtitle||'',item.body||'',item.markdown||'',item.summaryTitle||'',item.summaryText||''].join(' ').toLowerCase();
-      if(hay.indexOf(searchQuery)===-1) return false;
+      var hay = [
+        item.title||'', item.subtitle||'', item.body||'',
+        item.markdown||'', item.summaryTitle||'', item.summaryText||'',
+        item.content||''
+      ].join(' ').toLowerCase();
+      if(hay.indexOf(searchQuery) === -1) return false;
     }
     return true;
   });
-  if(!filtered.length){ grid.style.display='none'; empty.style.display='block'; return; }
-  grid.style.display='block'; empty.style.display='none';
-  grid.innerHTML=filtered.map(function(item){
-    if(item.type==='resume')          return buildResumeCard(item);
-    if(item.type==='story')           return buildStoryCard(item);
-    if(item.type==='shadow')          return buildShadowCard(item);
-    if(item.type==='holistic-career') return buildHolisticCard(item);
-    return '';
+
+  if(!filtered.length){
+    grid.style.display  = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  var html = filtered.map(function(item){
+    // Normalize type — handle unexpected casing or spacing
+    var t = (item.type || '').toLowerCase().trim();
+    if(t === 'resume')          return buildResumeCard(item);
+    if(t === 'story')           return buildStoryCard(item);
+    if(t === 'shadow' || t === 'ai-insight') return buildShadowCard(item);
+    if(t === 'holistic-career' || t === 'holistic_career' || t === 'career')
+                                return buildHolisticCard(item);
+    // Fallback: render a generic card so nothing is silently swallowed
+    return buildGenericCard(item);
   }).join('');
+
+  if(!html.trim()){
+    grid.style.display  = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  grid.style.display  = 'block';
+  empty.style.display = 'none';
+  grid.innerHTML = html;
+}
+
+/* ── Generic fallback card (catches unknown types) ────────── */
+function buildGenericCard(item){
+  var preview = (item.body || item.markdown || item.content || item.summaryText || '').slice(0, 200);
+  return '<div class="saved" id="saved-'+item.id+'" onclick="savedModalOpen(\''+item.id+'\')">'
+    +'<div class="saved-header">'
+    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔖</div>'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font-size:.82rem;font-weight:700;color:var(--text)">'+esc(item.title||item.summaryTitle||'Saved Item')+'</div>'
+    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+esc(item.type||'unknown')+' · '+relTime(item.savedAt)+'</div>'
+    +'</div>'
+    +'<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">'+esc(item.type||'item')+'</span>'
+    +'</div>'
+    +(preview ? '<div class="saved-body"><div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'</div></div>' : '')
+    +'<div class="saved-footer" onclick="event.stopPropagation()">'
+    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
+    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
+    +'</div></div>';
 }
 
 /* ── Init ────────────────────────────────────────────────── */
-renderSaved();
-document.addEventListener('pageChanged', function(e){ if(e.detail==='saved') renderSaved(); });
+// Defer until DOM is fully ready — avoids race with SPA page injection
+function _initSaved(){
+  if(!document.getElementById('saved-grid')){
+    setTimeout(_initSaved, 100);
+    return;
+  }
+  renderSaved();
+}
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _initSaved);
+} else {
+  _initSaved();
+}
+
+// Re-render when navigating to this page
+document.addEventListener('pageChanged', function(e){
+  if(e.detail === 'saved') renderSaved();
+});
+
+// Also hook into navigateTo if available
+(function _patchNav(){
+  if(typeof window.navigateTo !== 'function'){ setTimeout(_patchNav, 150); return; }
+  var _orig = window.navigateTo;
+  window.navigateTo = function(page, event){
+    _orig(page, event);
+    if(page === 'saved') setTimeout(renderSaved, 50);
+  };
+})();
 
 })();
 </script>
-@endpush
+@endpush\n\n<x-ai-chatbot />
