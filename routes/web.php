@@ -44,3 +44,7 @@ Route::post('/api/chat', function (\Illuminate\Http\Request $request) {
 Route::get('/insights', function () {
     return view('insights');
 })->name('insights');
+
+Route::get('/explore', function () {
+    return view('explore');
+})->name('explore');

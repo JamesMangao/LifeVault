@@ -114,6 +114,45 @@
 .comm-form-input:focus,.comm-form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.12)}
 .comm-form-textarea{resize:vertical;min-height:120px;line-height:1.6;font-family:'Newsreader',serif;font-size:.95rem;font-weight:300}
 @media(max-width:640px){.community-stats{grid-template-columns:1fr}.feed-container{max-width:100%}}
+
+/* Guest Access UI */
+body.guest-access .feed-composer,
+body.guest-access .post-delete-btn,
+body.guest-access .comment-input-row,
+body.guest-access .composer-type-btn:not(.active),
+body.guest-access [onclick="openShareModal()"] {
+    display: none !important;
+}
+
+.guest-login-nudge {
+    display: none;
+    background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(79,142,247,.15));
+    border: 1px solid rgba(124,58,237,.3);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 24px;
+    backdrop-filter: blur(8px);
+    animation: slideDown .4s ease both;
+}
+body.guest-access .guest-login-nudge {
+    display: block;
+}
+.guest-nudge-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #a78bfa, #4f8ef7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.guest-nudge-text {
+    font-family: 'Newsreader', serif;
+    font-size: .9rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+    font-style: italic;
+}
 </style>
 
 {{-- ═══════════ COMMUNITY PAGE ═══════════ --}}
@@ -131,6 +170,11 @@
     <div class="comm-stat"><div class="comm-stat-val" id="comm-stat-likes" style="color:var(--rose)">—</div><div class="comm-stat-label">Likes Given</div></div>
   </div>
   <div class="feed-container">
+    <div class="guest-login-nudge">
+      <div class="guest-nudge-title">Join the LifeVault Community</div>
+      <div class="guest-nudge-text">Sign in to share your journey, like posts, and connect with others growing together.</div>
+      <button class="btn btn-primary" onclick="location.reload()">Sign In with Google</button>
+    </div>
     <div class="feed-composer">
       <div class="composer-top">
         <img class="composer-avatar" id="composer-avatar" src="" alt="" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
@@ -209,7 +253,15 @@
   function getHandle(p){return p.authorUsername||(p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user'}
   function waitForFirebase(cb){if(window.db&&window.auth&&window._fbFS)cb();else setTimeout(()=>waitForFirebase(cb),80)}
 
+  // Initialize community feed when Firebase is ready
+  waitForFirebase(() => {
+    if (typeof window.subscribeFeed === 'function') {
+      window.subscribeFeed();
+    }
+  });
+
   let _currentFilter='all', _composerType='thought', _composerPhotos=[], _expandedPostId=null;
+```
 
 
 
@@ -286,8 +338,11 @@
   window.lvLike = async function(e, btn, postId) {
     e.stopPropagation();
     e.preventDefault();
-    const cu = window.currentUser; if (!cu) return;
-    const post = (window.feedPosts || []).find(p => p.id === postId); if (!post) return;
+    // Guest check
+    if(window.isGuestMode) {
+        window.toast?.('Please sign in to like posts', '🔐');
+        return;
+    }
 
     const liked = (post.likes || []).includes(cu.uid);
     const heart = btn.querySelector('.heart-icon');
@@ -769,10 +824,10 @@
   window.renderFeed     = _communityRenderFeed;
   
   function _communityRenderPostCard(p){
-    if(!window.currentUser) return '';
-
     const cu=window.currentUser;
-    const isOwn=p.authorId===cu.uid, liked=(p.likes||[]).includes(cu.uid);
+    const isGuest = window.isGuestMode || !cu;
+    const isOwn= !isGuest && p.authorId===cu.uid;
+    const liked=!isGuest && (p.likes||[]).includes(cu.uid);
     const timeAgo=relativeTime(p.createdAt), bc=TYPE_BADGE_CLASS[p.type]||'badge-journal';
     const handle=getHandle(p), pid=p.id;
 

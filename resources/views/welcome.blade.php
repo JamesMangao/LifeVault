@@ -45,9 +45,18 @@
         </div>
 
         <nav class="lv-nav" id="lv-nav">
-            <div class="lv-nav-logo">LifeVault</div>
+            <div class="lv-nav-logo" onclick="location.reload()" style="cursor:pointer">
+                <img src="{{ asset('logo.png') }}" alt="LifeVault Logo" style="height: 32px; width: auto; display: block;">
+                LifeVault
+            </div>
+            <div class="lv-nav-center">
+                <a href="javascript:void(0)" onclick="document.getElementById('lv-features').scrollIntoView({behavior:'smooth'})" class="nav-link"></a>
+            </div>
             <div class="lv-nav-right">
-                <button class="lv-btn-ghost" onclick="lvOpenModal('lv-journal-modal')">See Demo</button>
+                <a href="/explore" class="lv-btn-ghost" style="text-decoration:none;display:flex;align-items:center;gap:6px">
+                    <span>🌐</span> Community
+                </a>
+                <button class="lv-btn-ghost" onclick="document.getElementById('lv-features').scrollIntoView({behavior:'smooth'})">See Demo</button>
                 <button class="lv-btn-primary" id="google-login-btn">Start Free →</button>
             </div>
         </nav>
@@ -73,6 +82,9 @@
                 <button class="lv-btn-outline" onclick="document.getElementById('lv-features').scrollIntoView({behavior:'smooth'})">
                     Explore AI Tools ↓
                 </button>
+                <a href="/explore" class="lv-btn-outline" style="text-decoration:none;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03)">
+                    <span>🌍</span> Explore Community
+                </a>
             </div>
             <div class="lv-scroll-hint">
                 <span>scroll to explore</span>
@@ -184,6 +196,31 @@
                 <button id="lv-chatbot-close" onclick="lvToggleChatbot()">✕</button>
             </div>
             <div id="lv-chatbot-messages"></div>
+
+            <!-- FAQ Row -->
+            <div id="lv-chatbot-faqs">
+                <div class="lv-faq-track lv-track-left" style="animation-duration:50s">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
+                </div>
+                <div class="lv-faq-track lv-track-right" style="animation-duration:45s">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
+                </div>
+            </div>
+
             <div id="lv-chatbot-input-area">
                 <input type="text" id="lv-chatbot-input"
                        placeholder="Ask about journaling, career, self-discovery…"
@@ -606,10 +643,21 @@
     }
     .lv-nav.lv-scrolled { background: rgba(8,9,26,0.88); }
     .lv-nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
         font-weight: 800; font-size: 1.35rem; letter-spacing: -.04em;
         background: linear-gradient(135deg,#a78bfa,#22d3ee);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
+    .lv-nav-center {
+        display: flex; gap: 32px; align-items: center; position: absolute; left: 50%; transform: translateX(-50%);
+    }
+    .nav-link {
+        text-decoration: none; font-size: .85rem; font-weight: 600; color: #8892b0;
+        transition: color .2s;
+    }
+    .nav-link:hover { color: #f0f2ff; }
     .lv-nav-right { display: flex; gap: 12px; align-items: center; }
     .lv-btn-ghost {
         background: transparent; border: 1px solid rgba(255,255,255,.07);
@@ -966,6 +1014,65 @@
     }
     #lv-chatbot-messages::-webkit-scrollbar { width: 3px; }
     #lv-chatbot-messages::-webkit-scrollbar-thumb { background: rgba(124,58,237,.3); border-radius: 99px; }
+
+    /* ════ FAQ SECTION ════ */
+    #lv-chatbot-faqs {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 7px;
+        padding: 10px 0;
+        border-top: 1px solid rgba(255,255,255,.06);
+        border-bottom: 1px solid rgba(255,255,255,.06);
+        background: rgba(124,58,237,.03);
+        flex-shrink: 0;
+    }
+    #lv-chatbot-faqs:hover .lv-faq-track { animation-play-state: paused; }
+    .lv-faq-track {
+        display: flex !important;
+        flex-direction: row;
+        gap: 10px;
+        padding: 0 12px;
+        white-space: nowrap;
+        will-change: transform;
+        height: 32px;
+        align-items: center;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    .lv-track-left  { animation: lv-faq-left  linear infinite; }
+    .lv-track-right { animation: lv-faq-right linear infinite; }
+    @keyframes lv-faq-left {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+    @keyframes lv-faq-right {
+        0%   { transform: translateX(-50%); }
+        100% { transform: translateX(0); }
+    }
+    .lv-faq-item {
+        flex-shrink: 0;
+        display: inline-block;
+        background: rgba(124,58,237,.1);
+        border: 1px solid rgba(124,58,237,.25);
+        border-radius: 20px;
+        padding: 5px 14px;
+        color: #c4b5fd;
+        font-size: .71rem;
+        font-family: 'Syne', sans-serif;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        line-height: 1.6;
+        transition: background .18s, border-color .18s, color .18s, transform .15s;
+    }
+    .lv-faq-item:hover {
+        background: rgba(124,58,237,.25);
+        border-color: rgba(167,139,250,.6);
+        color: #fff;
+        transform: translateY(-1px);
+    }
 
     .lv-chat-msg { display: flex; gap: 8px; animation: lv-fadeup .25s ease; }
     .lv-chat-msg.lv-chat-user { flex-direction: row-reverse; }
@@ -1474,15 +1581,24 @@ YOUR PERSONALITY & RESPONSE STYLE:
             });
         };
 
-        // ── Hide FAB when logged in ──
-        document.addEventListener('userLoggedIn', function() {
-            if (fab)     fab.style.display     = 'none';
-            if (overlay) overlay.style.display = 'none';
-            _chatHistory = [];
-        });
+        /* ── FAQ click shortcut ── */
+        window.lvSendFAQ = function (q) {
+            if (!_chatOpen) window.lvToggleChatbot();
+            if (input) { input.value = q; window.lvSendChat(); }
+        };
+
+        // ── Hide FAB when logged in (disabled to show FAQ for all users) ──
+        // document.addEventListener('userLoggedIn', function() {
+            //     if (fab)     fab.style.display     = 'none';
+            //     if (overlay) overlay.style.display = 'none';
+            //     _chatHistory = [];
+        // });
 
     })();
     </script>
+
+    {{-- Global Loading Modal --}}
+    @include('components.loading-modal')
 
 </body>
 </html>

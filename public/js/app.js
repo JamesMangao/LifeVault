@@ -85,6 +85,8 @@ window.addEventListener('load', () => {
     document.getElementById('loading').classList.add('hidden');
     onAuthStateChanged(auth, async user => {
       if (user) {
+        window.isGuestMode = false;
+        document.body.classList.remove('guest-access');
         const proceed = await _deletionGuard.checkOnLogin(user);
         if (!proceed) return;
         currentUser = user;
@@ -92,7 +94,9 @@ window.addEventListener('load', () => {
         showApp(user);
         loadAll();
       }
-      else showAuth();
+      else {
+        if (!window.isGuestMode) showAuth();
+      }
     });
     setTimeout(() => {
       const authEl = document.getElementById('auth-screen');
@@ -305,6 +309,7 @@ function updateGreeting() {
 /* ══ NAVIGATION ══════════════════════════════════════════════ */
 window.navigateTo = (page, event) => {
   if (event) event.stopPropagation();
+  
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
@@ -321,13 +326,19 @@ window.navigateTo = (page, event) => {
   }
 
   localStorage.setItem('lifeVaultLastPage', page);
+  
   closeSidebar();
   if (page === 'insights')   renderInsights();
-  if (page === 'community')  { subscribeFeed(); document.getElementById('new-posts-dot').style.display='none'; }
+  if (page === 'community')  { 
+    subscribeFeed(); 
+    const dot = document.getElementById('new-posts-dot');
+    if (dot) dot.style.display='none'; 
+  }
   if (page === 'profile')    renderProfilePage();
   if (page === 'settings')   _settingsModule.load();
   if (page === 'shadow-self' || page === 'life-story') initializeLearningResources();
 };
+
 
 function restoreLastPage() {
   const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
