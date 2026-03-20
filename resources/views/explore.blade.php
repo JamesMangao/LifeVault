@@ -73,6 +73,7 @@
     </div>
 
     @include('components.ai-chatbot')
+    @include('layouts.partials._post-expand')
 
     <!-- Firebase & App Logic -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -122,7 +123,7 @@
             }
 
             return `
-                <div class="post-card">
+<div class="post-card" data-post-id="${pid}" onclick="if(typeof openExpandedPost==='function') openExpandedPost('${pid}');">
                     <div class="post-header">
                         <img src="${p.authorAvatar||'https://ui-avatars.com/api/?name=U'}" class="post-avatar">
                         <div class="post-meta">
@@ -163,7 +164,8 @@
                     return;
                 }
                 
-                feedList.innerHTML = snap.docs.map(doc => renderExplorePost({id: doc.id, ...doc.data()})).join('');
+        window.explorePosts = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        feedList.innerHTML = snap.docs.map(doc => renderExplorePost({id: doc.id, ...doc.data()})).join('');
             } catch(e) {
                 console.error(e);
                 feedList.innerHTML = '<div class="feed-empty">Check Firestore rules or connection.</div>';
