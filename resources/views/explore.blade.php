@@ -49,7 +49,10 @@
 <body>
 
     <nav class="explore-nav">
-        <a href="/" class="explore-logo">LifeVault</a>
+        <a href="/" class="explore-logo" style="display:flex;align-items:center;gap:12px">
+            <img src="{{ asset('logo.png') }}" alt="LifeVault Logo" style="height: 32px; width: auto; display: block;">
+            LifeVault
+        </a>
         <div class="nav-right">
             <button class="lv-btn-primary" onclick="window.location.href='/'">Sign In →</button>
         </div>
