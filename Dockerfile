@@ -29,18 +29,11 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-RUN cp .env.example .env
-
-RUN php artisan key:generate --force
-
 # Install PHP dependencies (ignore platform reqs for GD? No, we have it)
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
 # Install Node.js dependencies and build assets
 RUN npm install && npm run build
-
-# Generate a new app key (optional – you can also set via env)
-RUN php artisan key:generate --force
 
 # Set permissions for storage and bootstrap/cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
