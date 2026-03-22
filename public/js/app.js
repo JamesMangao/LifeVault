@@ -2037,6 +2037,9 @@ function applyProfileToUI() {
   if (el('profile-cover-display')) el('profile-cover-display').style.background = p.coverGradient || COVER_PRESETS[0];
 
   const badges = [];
+  if (p.username === 'ciaxyn' || p.displayName === 'Bienvinido James Publico') {
+    badges.push({ label: '👑 Owner', color: 'rgba(255, 215, 0, 0.2)', border: 'rgba(255, 215, 0, 0.4)' });
+  }
   if (journals.length >= 1) badges.push({ label: '📓 Writer', color: 'rgba(79,142,247,.2)', border: 'rgba(79,142,247,.4)' });
   if (tasks.filter(t => t.done).length) badges.push({ label: '✅ Doer', color: 'rgba(52,211,153,.15)', border: 'rgba(52,211,153,.4)' });
   if (goals.length >= 1) badges.push({ label: '🎯 Goal-setter', color: 'rgba(167,139,250,.15)', border: 'rgba(167,139,250,.4)' });
