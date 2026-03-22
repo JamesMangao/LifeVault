@@ -177,6 +177,16 @@
   #saved-modal-overlay { align-items:flex-end; padding:0; }
   #saved-modal-box     { max-width:100%;max-height:92vh;border-radius:20px 20px 0 0; }
 }
+
+.markdown-content h1, .markdown-content h2, .markdown-content h3 { font-family: 'Syne', sans-serif; margin-top: 1.5rem; margin-bottom: 0.8rem; color: var(--text); }
+.markdown-content h1 { font-size: 1.4rem; }
+.markdown-content h2 { font-size: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.markdown-content h3 { font-size: 1.1rem; }
+.markdown-content p { margin-bottom: 1rem; }
+.markdown-content ul, .markdown-content ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+.markdown-content li { margin-bottom: 0.4rem; }
+.markdown-content strong { color: var(--accent); font-weight: 700; }
+.markdown-content code { background: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
 </style>
 
 @push('scripts')
@@ -493,8 +503,8 @@ function buildModalSummary(item) {
 }
 
 function buildModalBody(item) {
-  if (item.type === 'resume') return '<div style="white-space:pre-wrap">' + esc(item.markdown || '') + '</div>';
-  if (item.type === 'holistic-career') return '<div style="white-space:pre-wrap">' + esc(item.content || '') + '</div>';
+  if (item.type === 'resume') return '<div class="markdown-content">' + (typeof marked !== 'undefined' ? marked.parse(item.markdown || '') : esc(item.markdown || '')) + '</div>';
+  if (item.type === 'holistic-career') return '<div class="markdown-content">' + (typeof marked !== 'undefined' ? marked.parse(item.content || '') : esc(item.content || '')) + '</div>';
   if (item.type === 'story') return '<div style="white-space:pre-wrap">' + esc(item.body || '') + '</div>';
   if (item.type === 'shadow') {
     var CM = {rose: 'var(--rose)', amber: 'var(--amber)', lavender: 'var(--lavender)', teal: 'var(--teal)', accent: 'var(--accent)'};

@@ -19,6 +19,7 @@
             measurementId:     "{{ config('services.firebase.measurement_id') }}"
         };
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -88,7 +89,9 @@
     <nav class="lv-nav" id="lv-nav">
         <a class="lv-nav-logo" href="/" style="cursor:pointer">
             <img src="{{ asset('logo.png') }}" alt="LifeVault Logo" style="height:32px;width:auto;display:block;">
-            LifeVault
+            <span class="sidebar-logo-wordmark">
+                <span class="sidebar-logo-life">Life</span><span class="sidebar-logo-vault">Vault</span>
+            </span>
         </a>
         <div class="lv-nav-center">
             <a href="javascript:void(0)" onclick="document.getElementById('lv-features').scrollIntoView({behavior:'smooth'})" class="nav-link"></a>
@@ -527,7 +530,8 @@
 
 .lv-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;background:rgba(8,9,26,.6);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.04);transition:background .4s}
 .lv-nav.lv-scrolled{background:rgba(8,9,26,.88)}
-.lv-nav-logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.35rem;letter-spacing:-.04em;background:linear-gradient(135deg,#a78bfa,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.lv-nav-logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.35rem;letter-spacing:-.04em;transition:transform .25s ease;text-decoration:none}
+.lv-nav-logo:hover{transform:scale(1.03)}
 .lv-nav-center{display:flex;gap:32px;align-items:center;position:absolute;left:50%;transform:translateX(-50%)}
 .nav-link{text-decoration:none;font-size:.85rem;font-weight:600;color:#8892b0;transition:color .2s}
 .nav-link:hover{color:#f0f2ff}
@@ -977,7 +981,7 @@ document.addEventListener('DOMContentLoaded',function(){
     var fab=document.getElementById('lv-chat-fab'),overlay=document.getElementById('lv-chatbot-overlay');
     var messages=document.getElementById('lv-chatbot-messages'),input=document.getElementById('lv-chatbot-input'),sendBtn=document.getElementById('lv-chatbot-send');
     var SYSTEM_PROMPT=`You are LifeVault AI — the built-in personal growth assistant for LifeVault, a private AI-powered journaling and self-discovery web app. Private, encrypted, free to start, Google sign-in. Tools: 📓 Journal, 🔮 Shadow Self Analyzer, 📖 Life Story Generator, ✨ Holistic Career Advisor, 📄 Resume Analyzer, ✅ Tasks, 🎯 Goals, 🔖 Saved Items. Be warm, insightful, encouraging. Rich detail on features. End with invitation to sign in.`;
-    function renderMarkdown(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^[-•]\s(.+)/gm,'<li>$1</li>').replace(/(<li>[\s\S]+?<\/li>)(?=(\n|$))/g,'<ul>$1</ul>').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');}
+    function renderMarkdown(t){return typeof marked!=='undefined'?marked.parse(t):t.replace(/\n/g,'<br>');}
     function getTime(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
     function appendAIMsg(text,isTyping){var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:3px';if(isTyping)wrap.id='lv-typing-wrap';var row=document.createElement('div');row.className='lv-chat-msg lv-chat-ai';var ico=document.createElement('div');ico.className='lv-chat-ico';ico.textContent='🤖';var bubble=document.createElement('div');bubble.className='lv-chat-bubble';bubble.innerHTML=isTyping?'<span class="lv-chat-typing"><span></span><span></span><span></span></span>':'<p>'+renderMarkdown(text)+'</p>';row.appendChild(ico);row.appendChild(bubble);wrap.appendChild(row);if(!isTyping){var m=document.createElement('div');m.className='lv-chat-meta';m.style.paddingLeft='40px';m.textContent=getTime();wrap.appendChild(m);}messages.appendChild(wrap);messages.scrollTop=messages.scrollHeight;return bubble;}
     function appendUserMsg(text){var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:3px';var row=document.createElement('div');row.className='lv-chat-msg lv-chat-user';var ico=document.createElement('div');ico.className='lv-chat-ico';ico.textContent='👤';var bubble=document.createElement('div');bubble.className='lv-chat-bubble';bubble.textContent=text;row.appendChild(ico);row.appendChild(bubble);wrap.appendChild(row);var m=document.createElement('div');m.className='lv-chat-meta lv-chat-user-meta';m.textContent=getTime();wrap.appendChild(m);messages.appendChild(wrap);messages.scrollTop=messages.scrollHeight;}

@@ -40,17 +40,18 @@ RUN npm install && npm run build
 # Set permissions for storage and bootstrap/cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite and headers
+RUN a2enmod rewrite headers
 
 # Configure MPM: Robustly disable event/worker and ensure prefork is enabled for PHP
 RUN a2dismod mpm_event mpm_worker || true \
     && a2enmod mpm_prefork
 
-# Configure Apache to listen on port 8080 (matching Railway expectation)
+# Configure Apache: Port, public folder, and COOP header for Firebase Auth popups
 RUN sed -i 's/Listen 80/Listen 8080/g' /etc/apache2/ports.conf \
     && sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf \
-    && sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
+    && sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
+    && echo 'Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"' >> /etc/apache2/apache2.conf
 
 # Allow .htaccess files and suppress ServerName warning
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf \

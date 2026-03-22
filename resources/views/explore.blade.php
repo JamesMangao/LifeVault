@@ -16,9 +16,7 @@
         }
         .explore-logo {
             font-size: 1.25rem; font-weight: 800; letter-spacing: -.03em;
-            background: linear-gradient(135deg,#4f8ef7,#a78bfa);
-            -webkit-background-clip: text; background-clip: text;
-            -webkit-text-fill-color: transparent; text-decoration: none;
+            text-decoration: none;
             display: flex; align-items: center; gap: 12px;
         }
         .explore-container { max-width: 800px; margin: 100px auto 40px; padding: 0 20px; }
@@ -85,7 +83,9 @@
     <nav class="explore-nav">
         <a href="/" class="explore-logo">
             <img src="{{ asset('logo.png') }}" alt="LifeVault Logo" style="height:32px;width:auto;display:block;">
-            LifeVault
+            <span class="sidebar-logo-wordmark">
+                <span class="sidebar-logo-life">Life</span><span class="sidebar-logo-vault">Vault</span>
+            </span>
         </a>
         <div>
             <button class="lv-btn-primary" onclick="window.location.href='/'">Sign In →</button>
