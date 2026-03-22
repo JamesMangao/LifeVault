@@ -25,14 +25,17 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Install PHP dependencies (ignore platform reqs for GD? No, we have it)
+# Create the SQLite database file (so Laravel doesn't complain)
+RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
+
+# Install PHP dependencies
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
-# Generate a new app key (optional – you can also set via env)
-RUN php artisan key:generate --force
+# Generate a new app key is not needed; we'll set APP_KEY via environment variable
+# RUN php artisan key:generate --force
 
-# Set permissions for storage and bootstrap/cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Set permissions for storage, cache, and database
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
