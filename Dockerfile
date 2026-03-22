@@ -44,7 +44,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 RUN a2enmod rewrite
 
 # Configure MPM: Disable event/worker and ensure prefork is enabled for PHP
-RUN a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf && a2enmod mpm_prefork
 
 # Configure Apache to serve from the public folder
 RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
