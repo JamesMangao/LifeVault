@@ -14,7 +14,7 @@ class LifeStoryAIController extends Controller
     {
         $request->validate([
             'prompt'     => 'required|string|max:30000',
-            'max_tokens' => 'nullable|integer|min:100|max:4000',
+            'max_tokens' => 'nullable|integer|min:100|max:6000',
         ]);
 
         $apiKey    = config('services.openrouter.key');

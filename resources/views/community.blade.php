@@ -299,10 +299,7 @@ body.guest-access .guest-login-nudge {
     }
     window.bindCommunityComposerEnter();
   });
-```
-
-
-
+  
   /* ── filterFeed ── */
   window.filterFeed=function(type,btn){
     _currentFilter=type;

@@ -181,6 +181,8 @@
 
 @push('scripts')
 <script>
+
+
 (function(){
 'use strict';
 
@@ -194,9 +196,12 @@ var activeTab = 'all';
 var searchQuery = '';
 var isLoading = false;
 
-// Initialize auth listener
-if (typeof window.onAuthStateChanged !== 'undefined' && window.db) {
-  window.onAuthStateChanged(window.auth, function(user) {
+function initSavedAuth() {
+  if (!window.auth || !window.db || !window.firebase) {
+    setTimeout(initSavedAuth, 200);
+    return;
+  }
+  window.firebase.onAuthStateChanged(window.auth, function(user) {
     currentUser = user;
     if (user) {
       loadSavedItems();
@@ -206,6 +211,8 @@ if (typeof window.onAuthStateChanged !== 'undefined' && window.db) {
     }
   });
 }
+
+initSavedAuth();
 
 /* ── Firestore Load ─────────────────────────────────────── */
 function loadSavedItems() {

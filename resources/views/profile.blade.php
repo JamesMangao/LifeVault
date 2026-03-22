@@ -573,4 +573,6 @@
     initProfilePage();
     _patchNavigateTo();
   }
+
 })();
+</script>

@@ -17,7 +17,8 @@ db = getFirestore(fbApp);
 
 window.auth = auth;
 window.db = db;
-window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, collectionGroup, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch, arrayUnion, arrayRemove, increment };
+window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, collectionGroup, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch, arrayUnion, arrayRemove, increment, onAuthStateChanged };
+window.firebase = window._fbFS;
 
 let currentUser = null;
 let journals = [], tasks = [], goals = [];
