@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure MPM and Apache modules (no app code dependency — keep in cached layer)
-RUN a2dismod mpm_event mpm_worker || true \
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
+    && rm -f /etc/apache2/mods-enabled/mpm_*.conf \
     && a2enmod mpm_prefork rewrite headers
 
 # Install Composer
