@@ -11,10 +11,14 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
+    gnupg \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd \
     && docker-php-ext-install pdo_mysql \
-    && docker-php-ext-install zip
+    && docker-php-ext-install zip \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -25,17 +29,17 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Create the SQLite database file (so Laravel doesn't complain)
-RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
-
-# Install PHP dependencies
+# Install PHP dependencies (ignore platform reqs for GD? No, we have it)
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
-# Generate a new app key is not needed; we'll set APP_KEY via environment variable
-# RUN php artisan key:generate --force
+# Install Node.js dependencies and build assets
+RUN npm install && npm run build
 
-# Set permissions for storage, cache, and database
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+# Generate a new app key (optional – you can also set via env)
+RUN php artisan key:generate --force
+
+# Set permissions for storage and bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
