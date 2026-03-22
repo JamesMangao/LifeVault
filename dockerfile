@@ -1,7 +1,7 @@
 # Use official PHP 8.3 with Apache
 FROM php:8.3-apache
 
-# Install system dependencies for PHP extensions
+# Install system dependencies and GD extension
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd \
-    && docker-php-ext-install pdo_mysql   # optional, if you ever need MySQL
+    && docker-php-ext-install pdo_mysql   # optional
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -23,14 +23,17 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Install PHP dependencies (ignore platform reqs for GD? No, we have it)
+# Create SQLite database file (if not already in repo)
+RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
+
+# Install PHP dependencies
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
-# Generate a new app key (optional – you can also set via env)
+# Generate app key (optional – can be set via environment)
 RUN php artisan key:generate --force
 
-# Set permissions for storage and bootstrap/cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
