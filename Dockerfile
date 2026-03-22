@@ -43,6 +43,9 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
+# Disable conflicting MPM modules to prevent "More than one MPM loaded" error
+RUN a2dismod mpm_event mpm_worker || true
+
 # Configure Apache to serve from the public folder
 RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
