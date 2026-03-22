@@ -21,7 +21,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN a2enmod rewrite headers
+# Aggressively ensure only mpm_prefork is loaded
+RUN a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite headers \
+    && apache2ctl -M
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
