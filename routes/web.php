@@ -4,6 +4,7 @@ use App\Http\Controllers\ResumeAnalysisController;
 use App\Http\Controllers\LifeStoryAIController;
 use App\Http\Controllers\ShadowSelfAIController;
 use App\Http\Controllers\HolisticCareerAdvisorController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 
@@ -33,6 +34,9 @@ Route::post('/resume/download-docx', [ResumeAnalysisController::class, 'download
 
     Route::post('/ai/holistic-career/analyze', [HolisticCareerAdvisorController::class, 'analyze'])
          ->name('ai.holistic-career.analyze');
+
+    Route::post('/notifications/mention', [NotificationController::class, 'sendMentionNotification'])
+         ->name('notifications.mention');
 });
 
 // ── AI Chat API ──────────────────────────────────────────────

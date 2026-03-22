@@ -291,7 +291,21 @@ window.savedAddItem = function(item) {
 window.savedDeleteItem = function(id) {
   if (!currentUser || !window.db) return;
 
-  if (!confirm('Delete this saved item?')) return;
+  window.confirmAction({
+    emoji: '🗑️',
+    title: 'Delete Item?',
+    body: 'Are you sure you want to remove this saved item?',
+    confirm: 'Delete',
+    danger: true,
+    onConfirm: (close) => {
+      var items = loadItems();
+      items = items.filter(function(i){return i.id !== id;});
+      persistItems(items);
+      _savedRender();
+      if(typeof window.toast==='function') window.toast('Item deleted', '🗑️');
+      close();
+    }
+  });
 
   try {
     var ref = window.firebase.doc(window.db, 'users', currentUser.uid, 'saved_items', id);
@@ -317,7 +331,19 @@ window.savedDeleteItem = function(id) {
 
 /* ── Clear All ──────────────────────────────────────────── */
 window.savedClearAll = function() {
-  if (!confirm('Delete all saved items? This cannot be undone.')) return;
+  window.confirmAction({
+    emoji: '⚠️',
+    title: 'Clear All?',
+    body: 'Are you sure you want to delete ALL saved items? This action cannot be undone.',
+    confirm: 'Clear All',
+    danger: true,
+    onConfirm: (close) => {
+      persistItems([]);
+      _savedRender();
+      if(typeof window.toast==='function') window.toast('All items cleared', '🗑️');
+      close();
+    }
+  });
 
   if (!currentUser || !window.db) return;
 

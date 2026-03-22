@@ -235,9 +235,18 @@ document.getElementById('google-login-btn').onclick = async () => {
   catch (e) { toast(e.message || 'Login failed', '❌'); }
 };
 window.signOutUser = async () => {
-  if (!confirm('Sign out?')) return;
-  if (feedUnsubscribe) feedUnsubscribe();
-  await fbSignOut(auth);
+  window.confirmAction({
+    emoji: '⏻',
+    title: 'Sign Out?',
+    body: 'Are you sure you want to sign out of your session?',
+    confirm: 'Sign Out',
+    danger: true,
+    onConfirm: async (close) => {
+      if (feedUnsubscribe) feedUnsubscribe();
+      await fbSignOut(auth);
+      close();
+    }
+  });
 };
 
 /* ══ LOAD ════════════════════════════════════════════════════ */
@@ -932,19 +941,29 @@ window.saveJournalEntry = async () => {
 };
 
 window.delJournal = async id => {
-  if (!confirm('Delete this entry?')) return;
-  const removed = journals.find(j => j.id === id);
-  journals = journals.filter(j => j.id !== id);
-  try {
-    await optimisticUpdate(async () => {
-      await deleteDoc(doc(db, 'users', currentUser.uid, 'journals', id));
-    }, null, () => {
-      if (removed) journals.unshift(removed);
-    });
-    renderAll(); toast('Entry deleted', '🗑️');
-  } catch (e) {
-    toast('Error: ' + e.message, '❌');
-  }
+  window.confirmAction({
+    emoji: '🗑️',
+    title: 'Delete Entry?',
+    body: 'This action cannot be undone. Are you sure you want to delete this journal entry?',
+    confirm: 'Delete',
+    danger: true,
+    onConfirm: async (close) => {
+      const removed = journals.find(j => j.id === id);
+      journals = journals.filter(j => j.id !== id);
+      try {
+        await optimisticUpdate(async () => {
+          await deleteDoc(doc(db, 'users', currentUser.uid, 'journals', id));
+        }, null, () => {
+          if (removed) journals.unshift(removed);
+        });
+        renderAll();
+        toast('Entry deleted', '🗑️');
+      } catch (e) {
+        toast('Error: ' + e.message, '❌');
+      }
+      close();
+    }
+  });
 };
 
 window.viewPhoto = url => {
@@ -1029,10 +1048,20 @@ window.toggleTask = async id => {
 };
 
 window.delTask = async id => {
-  if (!confirm('Delete this task?')) return;
-  tasks = tasks.filter(t => t.id !== id);
-  await deleteDoc(doc(db, 'users', currentUser.uid, 'tasks', id));
-  renderAll(); toast('Task removed', '🗑️');
+  window.confirmAction({
+    emoji: '🗑️',
+    title: 'Delete Task?',
+    body: 'Are you sure you want to remove this task?',
+    confirm: 'Delete',
+    danger: true,
+    onConfirm: async (close) => {
+      tasks = tasks.filter(t => t.id !== id);
+      await deleteDoc(doc(db, 'users', currentUser.uid, 'tasks', id));
+      renderAll();
+      toast('Task removed', '🗑️');
+      close();
+    }
+  });
 };
 
 function renderTasksIn(container, list) {
@@ -1132,17 +1161,29 @@ window.updGoal = async (id, delta) => {
 };
 
 window.delGoal = async id => {
-  if (!confirm('Delete this goal?')) return;
-  const removed = goals.find(g => g.id === id);
-  goals = goals.filter(g => g.id !== id);
-  try {
-    await optimisticUpdate(async () => {
-      await deleteDoc(doc(db, 'users', currentUser.uid, 'goals', id));
-    }, null, () => {
-      if (removed) goals.unshift(removed);
-    });
-    renderAll(); toast('Goal removed', '🗑️');
-  } catch (e) { toast('Error: ' + e.message, '❌'); }
+  window.confirmAction({
+    emoji: '🗑️',
+    title: 'Delete Goal?',
+    body: 'This will permanently remove this goal and its progress. Proceed?',
+    confirm: 'Delete',
+    danger: true,
+    onConfirm: async (close) => {
+      const removed = goals.find(g => g.id === id);
+      goals = goals.filter(g => g.id !== id);
+      try {
+        await optimisticUpdate(async () => {
+          await deleteDoc(doc(db, 'users', currentUser.uid, 'goals', id));
+        }, null, () => {
+          if (removed) goals.unshift(removed);
+        });
+        renderAll();
+        toast('Goal removed', '🗑️');
+      } catch (e) {
+        toast('Error: ' + e.message, '❌');
+      }
+      close();
+    }
+  });
 };
 
 function renderGoalsIn(container, list, mini = false) {

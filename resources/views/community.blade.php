@@ -355,6 +355,27 @@ body.guest-access .guest-login-nudge {
       _composerPhotos=[];
       const prev=document.getElementById('composer-img-previews'); prev.innerHTML=''; prev.style.display='none';
       window.toast?.('Posted! ✨','🌐');
+
+      // Process Mentions
+      if (text.includes('@')) {
+        const mentions = [...new Set(text.match(/@(\w+)/g))];
+        mentions.forEach(m => {
+          const username = m.substring(1);
+          fetch('/notifications/mention', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+            },
+            body: JSON.stringify({
+              username: username,
+              mentioner_name: authorName,
+              content_preview: text.substring(0, 100),
+              content_type: 'post'
+            })
+          }).catch(err => console.error('Mention failed:', err));
+        });
+      }
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   }
   window.communityPostThought = communityPostThought;
@@ -439,20 +460,29 @@ body.guest-access .guest-login-nudge {
 
   /* ── deletePost ── */
   window.deletePost=async function(postId){
-    if(!confirm('Delete this post?')) return;
-    if(typeof window.closeExpandedPost==='function'&&
-      (document.getElementById('post-expand-overlay-comm')?.classList.contains('open')||_expandedPostId===postId)){
-      window.closeExpandedPost();
-    }
-    try{
-      const{deleteDoc,doc}=window._fbFS;
-      await deleteDoc(doc(window.db,'community_posts',postId));
-      if(Array.isArray(window.feedPosts)){
-        window.feedPosts=window.feedPosts.filter(p=>p.id!==postId);
+    window.confirmAction({
+      emoji: '🗑️',
+      title: 'Delete Post?',
+      body: 'Are you sure you want to remove this post from the community?',
+      confirm: 'Delete',
+      danger: true,
+      onConfirm: async (close) => {
+        if(typeof window.closeExpandedPost==='function'&&
+          (document.getElementById('post-expand-overlay-comm')?.classList.contains('open')||_expandedPostId===postId)){
+          window.closeExpandedPost();
+        }
+        try{
+          const{deleteDoc,doc}=window._fbFS;
+          await deleteDoc(doc(window.db,'community_posts',postId));
+          if(Array.isArray(window.feedPosts)){
+            window.feedPosts=window.feedPosts.filter(p=>p.id!==postId);
+          }
+          if(typeof window.renderFeed==='function') window.renderFeed();
+          window.toast?.('Post deleted','🗑️');
+        }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
+        close();
       }
-      if(typeof window.renderFeed==='function') window.renderFeed();
-      window.toast?.('Post deleted','🗑️');
-    }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
+    });
   };
 
   /* ── repost ── */
@@ -676,6 +706,27 @@ body.guest-access .guest-login-nudge {
       });
       await updateDoc(doc(window.db,'community_posts',postId),{commentCount:increment(1)});
       loadComments(postId);
+
+      // Process Mentions in Comment
+      if (text.includes('@')) {
+        const mentions = [...new Set(text.match(/@(\w+)/g))];
+        mentions.forEach(m => {
+          const username = m.substring(1);
+          fetch('/notifications/mention', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+            },
+            body: JSON.stringify({
+              username: username,
+              mentioner_name: authorName,
+              content_preview: text.substring(0, 100),
+              content_type: 'comment'
+            })
+          }).catch(err => console.error('Mention failed:', err));
+        });
+      }
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
 
