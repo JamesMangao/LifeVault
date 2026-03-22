@@ -835,7 +835,7 @@ body.fx-glow .lv-card:hover {
 #lv-chat-fab.lv-chat-open{background:linear-gradient(135deg,#4b5563,#374151)}
 
 /* ── Chatbot Overlay ─────────────────────────────────────── */
-#lv-chatbot-overlay{position:fixed;bottom:104px;right:32px;z-index:499;width:390px;max-height:min(580px,calc(100vh - 130px));background:linear-gradient(145deg,rgba(13,15,35,.98),rgba(18,20,46,.98));border:1px solid rgba(124,58,237,.3);border-radius:24px;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04);transform:scale(.88) translateY(20px);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;overflow:hidden}
+#lv-chatbot-overlay{position:fixed;bottom:104px;right:32px;z-index:499;width:360px;max-height:min(500px,calc(100vh - 150px));background:linear-gradient(145deg,rgba(13,15,35,.98),rgba(18,20,46,.98));border:1px solid rgba(124,58,237,.3);border-radius:24px;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04);transform:scale(.88) translateY(20px);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;overflow:hidden}
 #lv-chatbot-overlay.lv-chat-visible{transform:scale(1) translateY(0);opacity:1;pointer-events:all}
 #lv-chatbot-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);flex-shrink:0}
 #lv-chatbot-title{display:flex;align-items:center;gap:10px}
@@ -856,7 +856,7 @@ body.fx-glow .lv-card:hover {
 .lv-faq-item:hover{background:rgba(124,58,237,.25);border-color:rgba(167,139,250,.6);color:#fff;transform:translateY(-1px)}
 .lv-chat-msg{display:flex;gap:8px;animation:lv-fadeup .25s ease}
 .lv-chat-msg.lv-chat-user{flex-direction:row-reverse}
-.lv-chat-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:var(--font-size-journal);line-height:1.6;font-family:var(--font-journal)}
+.lv-chat-bubble{max-width:85%;padding:10px 14px;border-radius:18px;font-size:0.88rem;line-height:1.5;font-family:var(--font-journal)}
 .lv-chat-bubble strong{font-weight:700;color:#f0f2ff}
 .lv-chat-bubble em{font-style:italic;color:#c4b5fd}
 .lv-chat-bubble ul{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:5px}
