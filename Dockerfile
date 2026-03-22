@@ -16,9 +16,16 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install pdo_mysql \
     && docker-php-ext-install zip
 
-# Force only mpm_prefork to be enabled (remove any other MPM symlinks)
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf && \
+# Force only mpm_prefork to be enabled:
+# 1. Delete all MPM module files from both mods-available and mods-enabled
+# 2. Re‑enable mpm_prefork
+RUN rm -f /etc/apache2/mods-available/mpm_*.load /etc/apache2/mods-available/mpm_*.conf && \
+    rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf && \
     a2enmod mpm_prefork
+
+# Verify that only mpm_prefork is enabled (optional but helpful for debugging)
+RUN ls -la /etc/apache2/mods-enabled/mpm_* && \
+    echo "MPM configuration fixed."
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -29,7 +36,7 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Create the SQLite database file
+# Create the SQLite database file (so Laravel doesn't complain)
 RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
 
 # Install PHP dependencies
