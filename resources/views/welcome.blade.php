@@ -86,10 +86,10 @@
     </div>
 
     <nav class="lv-nav" id="lv-nav">
-        <div class="lv-nav-logo" onclick="location.reload()" style="cursor:pointer">
+        <a class="lv-nav-logo" href="/" style="cursor:pointer">
             <img src="{{ asset('logo.png') }}" alt="LifeVault Logo" style="height:32px;width:auto;display:block;">
             LifeVault
-        </div>
+        </a>
         <div class="lv-nav-center">
             <a href="javascript:void(0)" onclick="document.getElementById('lv-features').scrollIntoView({behavior:'smooth'})" class="nav-link"></a>
         </div>

@@ -74,6 +74,15 @@
 .post-goal-meta{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);margin-top:4px}
 .tag{font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
 .loading-posts{text-align:center;padding:48px;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:.72rem}
+@keyframes commSkPulse{0%,100%{opacity:.35}50%{opacity:.65}}
+.comm-sk-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;animation:commSkPulse 1.2s ease-in-out infinite}
+.comm-sk-card:nth-child(2){animation-delay:.15s}.comm-sk-card:nth-child(3){animation-delay:.3s}.comm-sk-card:nth-child(4){animation-delay:.45s}.comm-sk-card:nth-child(5){animation-delay:.6s}.comm-sk-card:nth-child(6){animation-delay:.75s}
+.comm-sk-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.comm-sk-av{width:38px;height:38px;border-radius:50%;background:var(--surface2);flex-shrink:0}
+.comm-sk-lines{flex:1;min-width:0}
+.comm-sk-line{height:10px;border-radius:6px;background:var(--surface2);margin-bottom:8px}
+.comm-sk-line.short{width:55%}
+.comm-sk-body{height:48px;border-radius:8px;background:var(--surface2);opacity:.85}
 .feed-empty{text-align:center;padding:60px 24px;color:var(--muted)}
 .feed-empty .empty-icon{font-size:3rem;margin-bottom:16px}
 .feed-empty .empty-title{font-size:1rem;font-weight:700;margin-bottom:8px}
@@ -253,14 +262,43 @@ body.guest-access .guest-login-nudge {
   function getHandle(p){return p.authorUsername||(p.authorName||'anonymous').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user'}
   function waitForFirebase(cb){if(window.db&&window.auth&&window._fbFS)cb();else setTimeout(()=>waitForFirebase(cb),80)}
 
+  let _currentFilter='all', _composerType='thought', _composerPhotos=[], _expandedPostId=null;
+
+  const COMM_SK_CARD = `<div class="comm-sk-card"><div class="comm-sk-row"><div class="comm-sk-av"></div><div class="comm-sk-lines"><div class="comm-sk-line short"></div><div class="comm-sk-line" style="width:38%"></div></div></div><div class="comm-sk-body"></div></div>`;
+
+  window.bindCommunityComposerEnter = function () {
+    if (document.documentElement.dataset.lvComposerEnterBound === '1') return;
+    document.documentElement.dataset.lvComposerEnterBound = '1';
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.code !== 'Enter') return;
+      if (e.shiftKey || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (!t || t.id !== 'composer-text' || String(t.tagName || '').toUpperCase() !== 'TEXTAREA') return;
+      const page = document.getElementById('page-community');
+      if (!page || !page.classList.contains('active')) return;
+      if (document.body.classList.contains('guest-access')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const fn = window.communityPostThought || window.postThought;
+      if (typeof fn === 'function') fn();
+    }, true);
+  };
+
   // Initialize community feed when Firebase is ready
   waitForFirebase(() => {
     if (typeof window.subscribeFeed === 'function') {
       window.subscribeFeed();
     }
+    window.bindCommunityComposerEnter();
   });
 
-  let _currentFilter='all', _composerType='thought', _composerPhotos=[], _expandedPostId=null;
+  window.addEventListener('load', function lvCommunityOnLoad() {
+    window.removeEventListener('load', lvCommunityOnLoad);
+    if (typeof window.communityPostThought === 'function') {
+      window.postThought = window.communityPostThought;
+    }
+    window.bindCommunityComposerEnter();
+  });
 ```
 
 
@@ -301,8 +339,8 @@ body.guest-access .guest-login-nudge {
     if(!_composerPhotos.length) document.getElementById('composer-img-previews').style.display='none';
   };
 
-  /* ── postThought ── */
-  window.postThought=async function(){
+  /* ── postThought (restored on window.load after app.js so composer + Enter use this impl) ── */
+  async function communityPostThought(){
     const text=document.getElementById('composer-text').value.trim();
     if(!text&&!_composerPhotos.length){ window.toast?.('Write something first!','💭'); return; }
     const cu=window.currentUser; if(!cu) return;
@@ -321,7 +359,9 @@ body.guest-access .guest-login-nudge {
       const prev=document.getElementById('composer-img-previews'); prev.innerHTML=''; prev.style.display='none';
       window.toast?.('Posted! ✨','🌐');
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
-  };
+  }
+  window.communityPostThought = communityPostThought;
+  window.postThought = communityPostThought;
 
   /* ── toggleLike ── */
   window.toggleLike=async function(postId){
@@ -338,12 +378,14 @@ body.guest-access .guest-login-nudge {
   window.lvLike = async function(e, btn, postId) {
     e.stopPropagation();
     e.preventDefault();
-    // Guest check
     if(window.isGuestMode) {
         window.toast?.('Please sign in to like posts', '🔐');
         return;
     }
-
+    const cu = window.currentUser;
+    if (!cu) return;
+    const post = (window.feedPosts || []).find(p => p.id === postId);
+    if (!post) return;
     const liked = (post.likes || []).includes(cu.uid);
     const heart = btn.querySelector('.heart-icon');
     const count = btn.querySelector('.lv-like-count');
@@ -401,9 +443,17 @@ body.guest-access .guest-login-nudge {
   /* ── deletePost ── */
   window.deletePost=async function(postId){
     if(!confirm('Delete this post?')) return;
+    if(typeof window.closeExpandedPost==='function'&&
+      (document.getElementById('post-expand-overlay-comm')?.classList.contains('open')||_expandedPostId===postId)){
+      window.closeExpandedPost();
+    }
     try{
       const{deleteDoc,doc}=window._fbFS;
       await deleteDoc(doc(window.db,'community_posts',postId));
+      if(Array.isArray(window.feedPosts)){
+        window.feedPosts=window.feedPosts.filter(p=>p.id!==postId);
+      }
+      if(typeof window.renderFeed==='function') window.renderFeed();
       window.toast?.('Post deleted','🗑️');
     }catch(e){ window.toast?.('Error: '+e.message,'❌'); }
   };
@@ -423,7 +473,9 @@ body.guest-access .guest-login-nudge {
         authorId:cu.uid,authorName,authorAvatar,
         authorUsername:p.username||(authorName.toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)||'user'),
         isRepost:true,originalPostId:postId,
-        originalAuthorName:original.authorName,originalAuthorAvatar:original.authorAvatar,
+        originalAuthorName:original.authorName,
+        originalAuthorAvatar:(typeof window.getResolvedPostAuthorAvatar==='function'
+          ? window.getResolvedPostAuthorAvatar(original) : original.authorAvatar),
         likes:[],commentCount:0,repostCount:0,createdAt:serverTimestamp(),
       });
       await updateDoc(doc(window.db,'community_posts',postId),{repostCount:increment(1)});
@@ -443,7 +495,8 @@ body.guest-access .guest-login-nudge {
     const bc=TYPE_BADGE_CLASS[post.type]||'badge-journal', handle=getHandle(post);
 
     /* header */
-    document.getElementById('exp-avatar').src=post.authorAvatar||'';
+    document.getElementById('exp-avatar').src=(typeof window.getResolvedPostAuthorAvatar==='function'
+      ? window.getResolvedPostAuthorAvatar(post) : (post.authorAvatar||'')) || '';
     document.getElementById('exp-time').textContent=
       post.createdAt
         ? new Date(post.createdAt).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})
@@ -582,9 +635,12 @@ body.guest-access .guest-login-nudge {
         return;
       }
       const cu=window.currentUser;
-      listEl.innerHTML=comments.map(c=>`
+      listEl.innerHTML=comments.map(c=>{
+        const cav=typeof window.getResolvedAuthorAvatar==='function'
+          ? window.getResolvedAuthorAvatar(c.authorId,c.authorName,c.authorAvatar) : (c.authorAvatar||'');
+        return `
         <div class="comment-item">
-          <img src="${esc(c.authorAvatar||'')}" class="comment-avatar"
+          <img src="${esc(cav)}" class="comment-avatar"
                onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
           <div class="comment-bubble">
             <div class="comment-author">
@@ -600,7 +656,8 @@ body.guest-access .guest-login-nudge {
             </div>
             <div class="comment-text">${esc(c.text)}</div>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }catch(err){
       const listEl=document.getElementById('exp-comments-list');
       if(listEl) listEl.innerHTML=`<div style="font-size:.72rem;color:var(--muted)">Could not load comments.</div>`;
@@ -831,8 +888,12 @@ body.guest-access .guest-login-nudge {
     const timeAgo=relativeTime(p.createdAt), bc=TYPE_BADGE_CLASS[p.type]||'badge-journal';
     const handle=getHandle(p), pid=p.id;
 
+    const origForRepost=p.isRepost&&p.originalPostId
+      ? (window.feedPosts||[]).find(x=>x.id===p.originalPostId):null;
+    const repostAv=origForRepost&&typeof window.getResolvedPostAuthorAvatar==='function'
+      ? window.getResolvedPostAuthorAvatar(origForRepost):(p.originalAuthorAvatar||'');
     const repost=p.isRepost
-      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(p.originalAuthorAvatar||'')}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"> <span>${esc(p.originalAuthorName||'')}</span></div>` : '';
+      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(repostAv)}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"> <span>${esc(p.originalAuthorName||'')}</span></div>` : '';
 
     let body='';
     if(p.type==='goal'){
@@ -855,12 +916,10 @@ body.guest-access .guest-login-nudge {
         ${p.tags?.length?`<div class="post-tags" onclick="event.stopPropagation()">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`:''}`;
     }
 
-    // onclick is on the whole card. Action buttons stop propagation inline.
-return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}" style="cursor:pointer">
-        onclick="(function(e){if(!e.target.closest('.post-action-btn,.post-delete-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')){window.openExpandedPost('${pid}')};})(event)"
-        style="cursor:pointer">
+    // Card expand: MutationObserver + feed-list delegation only (valid single root div).
+    return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}" style="cursor:pointer">
       <div class="post-header">
-        <img src="${esc(p.authorAvatar||'')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+        <img src="${esc(typeof window.getResolvedPostAuthorAvatar==='function'?window.getResolvedPostAuthorAvatar(p):(p.authorAvatar||''))}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
         <div class="post-meta">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <button class="post-author-btn" onclick="event.stopPropagation();openUserProfileModal('${p.authorId}')">
@@ -896,8 +955,10 @@ return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}" style
   function _communityRenderFeed(){
     const feedList=document.getElementById('feed-list'); if(!feedList) return;
     if(!Array.isArray(window.feedPosts)){
-      if(typeof showSkeleton==='function')
-        showSkeleton(feedList,5,'<div class="post-card" style="height:120px;margin:8px 0;opacity:.4"></div>');
+      if(typeof window.showSkeleton==='function')
+        window.showSkeleton(feedList,6,COMM_SK_CARD);
+      else
+        feedList.innerHTML='<div class="loading-posts">Loading feed…</div>';
       return;
     }
     const cu=window.currentUser;
@@ -983,7 +1044,7 @@ return `<div class="post-card" id="post-card-${pid}" data-post-id="${pid}" style
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',_startObserver);
   } else {
-  _startObserver();\n\n
+    _startObserver();
     setTimeout(_startObserver,200); // retry in case feed-list not yet in DOM
   }
 

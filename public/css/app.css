@@ -326,15 +326,8 @@ body {
 }
 
 @keyframes lv-logo-shimmer {
-
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
+    0%, 100% { background-position: 0% 50%; }
+    50%       { background-position: 100% 50%; }
 }
 
 .loader-tagline {
@@ -1424,16 +1417,51 @@ body {
 }
 
 .sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 0 36px 16px 18px;
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -.03em;
-  background: linear-gradient(135deg, var(--accent), var(--lavender));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 16px
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  -webkit-text-fill-color: unset
+}
+
+.sidebar-logo-img {
+  height: 32px;
+  width: auto;
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain
+}
+
+.sidebar-logo-wordmark {
+    background: linear-gradient(
+        135deg,
+        #a78bfa 0%,
+        #c4b5fd 40%,
+        #e0d9ff 60%,
+        #f5c842 80%,
+        #fbbf24 100%
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: lv-logo-shimmer 5s ease-in-out infinite;
+}
+
+
+.sidebar-logo-life {
+  color: var(--text)
+}
+
+.sidebar-logo-vault {
+  color: var(--amber)
 }
 
 .nav-section-label {

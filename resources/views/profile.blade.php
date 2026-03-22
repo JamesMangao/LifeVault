@@ -352,6 +352,7 @@
         newImg.onclick   = () => window.selectAvatar(newImg, downloadURL);
         $('avatar-picker-grid').appendChild(newImg);
         selectedAvatar = downloadURL;
+        window.__lvAvatarUrl = downloadURL;
 
       } catch (error) {
         console.error('Avatar upload error:', error);

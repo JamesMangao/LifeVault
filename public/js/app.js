@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut, updateProfile }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
+  getFirestore, collection, collectionGroup, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
   query, orderBy, limit, where, arrayUnion, arrayRemove, increment, serverTimestamp, onSnapshot, Timestamp, writeBatch
 }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -17,7 +17,7 @@ db = getFirestore(fbApp);
 
 window.auth = auth;
 window.db = db;
-window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch };
+window._fbFS = { doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, getDocs, collection, collectionGroup, query, where, orderBy, serverTimestamp, onSnapshot, writeBatch, arrayUnion, arrayRemove, increment };
 
 let currentUser = null;
 let journals = [], tasks = [], goals = [];
@@ -316,6 +316,7 @@ window.navigateTo = (page, event) => {
     subscribeFeed();
     const dot = document.getElementById('new-posts-dot');
     if (dot) dot.style.display = 'none';
+    if (typeof window.bindCommunityComposerEnter === 'function') window.bindCommunityComposerEnter();
   }
   if (page === 'profile') renderProfilePage();
   if (page === 'settings') _settingsModule.load();
@@ -1288,17 +1289,81 @@ function renderAll() {
 /* ══════════════════════════════════════════════════════════════
    COMMUNITY FEED
 ══════════════════════════════════════════════════════════════ */
+const authorAvatarCache = {};
+window.authorAvatarCache = authorAvatarCache;
+
+function uiAvatarFromName(name) {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=4f8ef7&color=fff`;
+}
+
+window.getResolvedAuthorAvatar = function (uid, authorName, storedAvatar) {
+  if (!uid) return storedAvatar || uiAvatarFromName(authorName);
+  const cu = window.currentUser;
+  const prof = window.userProfile || {};
+  if (cu && uid === cu.uid) {
+    const n = prof.displayName || authorName || cu.displayName || 'U';
+    return prof.avatarUrl || cu.photoURL || uiAvatarFromName(n);
+  }
+  if (authorAvatarCache[uid]) return authorAvatarCache[uid];
+  return storedAvatar || uiAvatarFromName(authorName);
+};
+
+window.getResolvedPostAuthorAvatar = function (p) {
+  if (!p) return uiAvatarFromName('');
+  return window.getResolvedAuthorAvatar(p.authorId, p.authorName, p.authorAvatar);
+};
+
+let _feedAvatarPrefetchGen = 0;
+
+async function prefetchAuthorAvatarsFromPosts(posts) {
+  if (!posts?.length || !db) return;
+  const uids = [...new Set(posts.map(p => p.authorId).filter(Boolean))];
+  const cu = window.currentUser;
+  const need = uids.filter(uid => (!cu || uid !== cu.uid) && authorAvatarCache[uid] == null);
+  const chunkSize = 10;
+  for (let i = 0; i < need.length; i += chunkSize) {
+    const chunk = need.slice(i, i + chunkSize);
+    await Promise.all(chunk.map(async uid => {
+      try {
+        const [profileSnap, userSnap] = await Promise.all([
+          getDoc(doc(db, 'users', uid, 'profile', 'data')),
+          getDoc(doc(db, 'users', uid))
+        ]);
+        const prof = profileSnap.exists() ? profileSnap.data() : {};
+        const ud = userSnap.exists() ? userSnap.data() : {};
+        const name = prof.displayName || ud.displayName || 'User';
+        authorAvatarCache[uid] = prof.avatarUrl || ud.photoURL || uiAvatarFromName(name);
+      } catch {
+        const sample = posts.find(p => p.authorId === uid);
+        authorAvatarCache[uid] = sample?.authorAvatar || uiAvatarFromName(sample?.authorName);
+      }
+    }));
+  }
+}
+
+function renderCommunityFeedOrFallback() {
+  if (typeof window.renderFeed === 'function') window.renderFeed();
+  else renderFeed();
+}
+
 function subscribeFeed() {
   if (feedUnsubscribe) return;
+  feedPosts = [];
   window.feedPosts = undefined;
-  renderFeed();
+  renderCommunityFeedOrFallback();
 
   const q = query(collection(db, 'community_posts'), orderBy('createdAt', 'desc'), limit(60));
   feedUnsubscribe = onSnapshot(q, snap => {
+    const gen = ++_feedAvatarPrefetchGen;
     feedPosts = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
     window.feedPosts = feedPosts;
-    renderFeed();
+    renderCommunityFeedOrFallback();
     updateCommStats();
+    prefetchAuthorAvatarsFromPosts(feedPosts).then(() => {
+      if (gen !== _feedAvatarPrefetchGen) return;
+      if (typeof window.renderFeed === 'function') window.renderFeed();
+      else renderFeed();
+    });
     const activePage = document.querySelector('.page.active')?.id;
     if (activePage !== 'page-community' && snap.docChanges().some(c => c.type === 'added')) {
       document.getElementById('new-posts-dot').style.display = 'inline-block';
@@ -1309,9 +1374,13 @@ function subscribeFeed() {
 }
 
 function updateCommStats() {
-  document.getElementById('comm-stat-posts').textContent = feedPosts.length;
-  document.getElementById('comm-stat-members').textContent = new Set(feedPosts.map(p => p.authorId)).size;
-  document.getElementById('comm-stat-likes').textContent = feedPosts.reduce((s, p) => s + (p.likes?.length || 0), 0);
+  const pEl = document.getElementById('comm-stat-posts');
+  if (!pEl) return;
+  pEl.textContent = feedPosts.length;
+  const mEl = document.getElementById('comm-stat-members');
+  if (mEl) mEl.textContent = new Set(feedPosts.map(p => p.authorId)).size;
+  const lEl = document.getElementById('comm-stat-likes');
+  if (lEl) lEl.textContent = feedPosts.reduce((s, p) => s + (p.likes?.length || 0), 0);
 }
 
 window.setComposerType = type => {
@@ -1465,8 +1534,13 @@ function renderPostCard(p) {
   const liked = (p.likes || []).includes(currentUser?.uid);
   const timeAgo = relativeTime(p.createdAt);
   const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
+  const origForRepost = p.isRepost && p.originalPostId
+    ? feedPosts.find(x => x.id === p.originalPostId) : null;
+  const repostAv = origForRepost
+    ? window.getResolvedPostAuthorAvatar(origForRepost)
+    : (p.originalAuthorAvatar || '');
   const repostBadge = p.isRepost
-    ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(p.originalAuthorAvatar || '')}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"><span>${esc(p.originalAuthorName || '')}</span></div>` : '';
+    ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(repostAv)}" style="width:16px;height:16px;border-radius:50%;object-fit:cover"><span>${esc(p.originalAuthorName || '')}</span></div>` : '';
 
   let typeHtml = '';
   if (p.type === 'goal') {
@@ -1491,12 +1565,12 @@ function renderPostCard(p) {
 
   return `<div class="post-card" id="post-card-${p.id}" data-post-id="${p.id}">
     <div class="post-header">
-      <img src="${esc(p.authorAvatar || '')}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+      <img src="${esc(window.getResolvedPostAuthorAvatar(p))}" class="post-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
       <div class="post-meta">
         <button class="post-author-btn" onclick="openUserProfileModal('${p.authorId}')">${esc(p.authorName || 'Anonymous')}</button> <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type] || p.type}</span>${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);padding:2px 6px;border-radius:4px;background:var(--surface2)">you</span>` : ''}
         <div class="post-time">${timeAgo}</div>
       </div>
-      ${isOwn ? `<button class="post-delete-btn" onclick="deletePost('${p.id}')">🗑️</button>` : ''}
+      ${isOwn ? `<button type="button" class="post-delete-btn" onclick="event.stopPropagation();event.preventDefault();deletePost('${p.id}')">🗑️</button>` : ''}
     </div>
     ${p.title ? `<div class="post-title">${esc(p.title)}</div>` : ''}
     ${repostBadge}${typeHtml}
@@ -1541,8 +1615,15 @@ window.toggleLike = async postId => {
 
 window.deletePost = async postId => {
   if (!confirm('Delete this post?')) return;
-  try { await deleteDoc(doc(db, 'community_posts', postId)); toast('Post deleted', '🗑️'); }
-  catch (e) { toast('Error: ' + e.message, '❌'); }
+  try {
+    await deleteDoc(doc(db, 'community_posts', postId));
+    feedPosts = feedPosts.filter(p => p.id !== postId);
+    window.feedPosts = feedPosts;
+    if (typeof window.closeExpandedPost === 'function') window.closeExpandedPost();
+    if (typeof window.renderFeed === 'function') window.renderFeed();
+    else renderFeed();
+    toast('Post deleted', '🗑️');
+  } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
 window.toggleComments = async postId => {
@@ -1566,7 +1647,7 @@ function renderComments(postId, comments) {
   if (!comments.length) { listEl.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);padding:8px 0">No comments yet.</div>`; return; }
   listEl.innerHTML = comments.map(c => `
     <div class="comment-item">
-      <img src="${esc(c.authorAvatar || '')}" class="comment-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+      <img src="${esc(window.getResolvedAuthorAvatar(c.authorId, c.authorName, c.authorAvatar))}" class="comment-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
       <div class="comment-bubble">
         <div class="comment-author"><span>${esc(c.authorName || 'Anonymous')}</span>${c.authorId === currentUser?.uid ? `<button class="comment-del" onclick="deleteComment('${postId}','${c.id}')">✕</button>` : ''}</div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">${relativeTime(c.createdAt)}</div>
@@ -1611,7 +1692,7 @@ window.repost = async postId => {
   try {
     await addDoc(collection(db, 'community_posts'), {
       ...post, id: undefined, isRepost: true,
-      originalAuthorName: post.authorName, originalAuthorAvatar: post.authorAvatar,
+      originalAuthorName: post.authorName, originalAuthorAvatar: window.getResolvedPostAuthorAvatar(post),
       authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, repostCount: 0, createdAt: serverTimestamp()
@@ -1782,6 +1863,7 @@ async function loadUserProfile() {
       };
       await setUserProfile(userProfile);
     }
+    window.userProfile = userProfile;
     applyProfileToUI();
   } catch (e) { console.warn('Profile load:', e.message); }
 }
@@ -1789,6 +1871,112 @@ async function loadUserProfile() {
 async function setUserProfile(data) {
   if (!currentUser) return;
   await setDoc(doc(db, 'users', currentUser.uid, 'profile', 'data'), data, { merge: true });
+}
+
+function displayAvatarUrl() {
+  const p = userProfile;
+  return p.avatarUrl || currentUser?.photoURL ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(p.displayName || currentUser?.displayName || 'U')}&background=4f8ef7&color=fff`;
+}
+
+async function syncRepostsOriginalAuthorFields(myPostIds, originalAuthorName, originalAuthorAvatar) {
+  if (!myPostIds?.length || originalAuthorName == null || originalAuthorAvatar == null) return;
+  const IN_MAX = 10;
+  const repatch = { originalAuthorName, originalAuthorAvatar };
+  try {
+    for (let i = 0; i < myPostIds.length; i += IN_MAX) {
+      const chunk = myPostIds.slice(i, i + IN_MAX);
+      const snap = await getDocs(query(
+        collection(db, 'community_posts'),
+        where('originalPostId', 'in', chunk)
+      ));
+      if (snap.empty) continue;
+      const BATCH_SIZE = 450;
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const d of snap.docs) {
+        batch.update(d.ref, repatch);
+        count++;
+        if (count % BATCH_SIZE === 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+        }
+      }
+      if (count % BATCH_SIZE !== 0) await batch.commit();
+    }
+  } catch (e) {
+    console.warn('[Profile] Repost original-author sync failed:', e.message);
+  }
+}
+
+async function syncCommunityPostsAuthorFields(uid, { authorName, authorAvatar, authorUsername }) {
+  if (!uid) return;
+  const patch = Object.fromEntries(
+    Object.entries({ authorName, authorAvatar, authorUsername }).filter(([, v]) => v !== undefined && v !== null)
+  );
+  if (!Object.keys(patch).length) return;
+  const uidStr = String(uid);
+  try {
+    const snap = await getDocs(query(collection(db, 'community_posts'), where('authorId', '==', uid)));
+    const myPostIds = snap.docs.map(d => d.id);
+    if (!snap.empty) {
+      const BATCH_SIZE = 450;
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const ds of snap.docs) {
+        batch.update(doc(db, 'community_posts', ds.id), patch);
+        count++;
+        if (count % BATCH_SIZE === 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+        }
+      }
+      if (count % BATCH_SIZE !== 0) await batch.commit();
+    }
+    if (patch.authorName != null && patch.authorAvatar != null && myPostIds.length) {
+      await syncRepostsOriginalAuthorFields(myPostIds, patch.authorName, patch.authorAvatar);
+    }
+    feedPosts.forEach(p => {
+      if (String(p.authorId) === uidStr) {
+        if (patch.authorName !== undefined) p.authorName = patch.authorName;
+        if (patch.authorAvatar !== undefined) p.authorAvatar = patch.authorAvatar;
+        if (patch.authorUsername !== undefined) p.authorUsername = patch.authorUsername;
+      }
+      if (p.originalPostId && myPostIds.includes(p.originalPostId)) {
+        if (patch.authorName !== undefined) p.originalAuthorName = patch.authorName;
+        if (patch.authorAvatar !== undefined) p.originalAuthorAvatar = patch.authorAvatar;
+      }
+    });
+    if (typeof window.renderFeed === 'function') window.renderFeed();
+    renderProfilePage();
+    if (patch.authorName != null && patch.authorAvatar != null) {
+      await syncCommunityCommentsAuthorFields(uid, patch.authorName, patch.authorAvatar);
+    }
+  } catch (e) {
+    console.warn('[Profile] Community post sync failed:', e.message);
+  }
+}
+
+async function syncCommunityCommentsAuthorFields(uid, authorName, authorAvatar) {
+  if (!uid || authorName == null || authorAvatar == null) return;
+  try {
+    const snap = await getDocs(query(collectionGroup(db, 'comments'), where('authorId', '==', uid)));
+    if (snap.empty) return;
+    const BATCH_SIZE = 450;
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const d of snap.docs) {
+      batch.update(d.ref, { authorName, authorAvatar });
+      count++;
+      if (count % BATCH_SIZE === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+    if (count % BATCH_SIZE !== 0) await batch.commit();
+  } catch (e) {
+    console.warn('[Profile] Community comment sync failed:', e.message);
+  }
 }
 
 function applyProfileToUI() {
@@ -1825,6 +2013,10 @@ function applyProfileToUI() {
     if (p.website) parts.push(`🔗 <a href="${esc(p.website)}" target="_blank" style="color:var(--accent);text-decoration:none">${esc(p.website.replace(/^https?:\/\//, ''))}</a>`);
     if (p.joinedAt) parts.push(`🗓 Joined ${new Date(p.joinedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`);
     infoEl.innerHTML = parts.join('<span style="margin:0 8px;opacity:.3">·</span>');
+  }
+
+  if (document.getElementById('page-community')?.classList.contains('active') && typeof window.renderFeed === 'function') {
+    window.renderFeed();
   }
 }
 
@@ -1865,38 +2057,92 @@ window.saveProfile = async () => {
     location: document.getElementById('edit-location').value.trim(),
     website: document.getElementById('edit-website').value.trim()
   };
-  try { await setUserProfile(userProfile); applyProfileToUI(); closeModal('edit-profile-modal'); toast('Profile updated! ✨', '👤'); }
-  catch (e) { toast('Error: ' + e.message, '❌'); }
+  try {
+    await setUserProfile(userProfile);
+    window.userProfile = userProfile;
+    await syncCommunityPostsAuthorFields(currentUser.uid, {
+      authorName: fullName,
+      authorAvatar: displayAvatarUrl(),
+      authorUsername: userProfile.username
+    });
+    try {
+      await updateProfile(currentUser, { displayName: fullName });
+      window.currentUser = auth.currentUser;
+    } catch (e) { console.warn('Auth profile displayName:', e.message); }
+    applyProfileToUI();
+    closeModal('edit-profile-modal');
+    toast('Profile updated! ✨', '👤');
+  } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
+function setPendingAvatarUrl(url) {
+  selectedAvatarUrl = url || '';
+  window.__lvAvatarUrl = url || '';
+}
+
 window.openAvatarModal = () => {
-  selectedAvatarUrl = userProfile.avatarUrl || currentUser?.photoURL || '';
-  const grid = document.getElementById('avatar-preset-grid');
-  grid.innerHTML = AVATAR_PRESETS.map((url, i) =>
-    `<img src="${url}" class="avatar-option ${selectedAvatarUrl === url ? 'selected' : ''}" onclick="selectAvatarPreset('${url}',this)" alt="Avatar ${i + 1}">`
-  ).join('');
+  const initial = userProfile.avatarUrl || currentUser?.photoURL || '';
+  setPendingAvatarUrl(initial);
+  const grid = document.getElementById('avatar-picker-grid') || document.getElementById('avatar-preset-grid');
+  if (!grid) return;
+  grid.innerHTML = AVATAR_PRESETS.map((url, i) => {
+    const sel = initial === url ? 'selected' : '';
+    const safeUrl = JSON.stringify(url);
+    return `<img src="${url}" class="avatar-option ${sel}" onclick="selectAvatarPreset(${safeUrl},this)" alt="Avatar ${i + 1}">`;
+  }).join('');
   const fi = document.getElementById('avatar-upload');
-  fi.value = '';
-  fi.onchange = async e => {
-    const file = e.target.files[0]; if (!file) return;
-    toast('Compressing…', '📷');
-    try { selectedAvatarUrl = await compressImageTo(file, 80 * 1024); toast('Avatar ready!', '✅'); }
-    catch { toast('Could not read image', '❌'); }
-  };
-  document.getElementById('avatar-modal').classList.add('open');
+  if (fi) {
+    fi.value = '';
+    fi.onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      toast('Compressing…', '📷');
+      try {
+        setPendingAvatarUrl(await compressImageTo(file, 80 * 1024));
+        toast('Avatar ready!', '✅');
+      } catch { toast('Could not read image', '❌'); }
+    };
+  }
+  const backdrop = grid.closest('.modal-backdrop');
+  if (backdrop) backdrop.classList.add('open');
+  else document.getElementById('avatar-modal')?.classList.add('open');
+};
+
+window.selectAvatar = (el, url) => {
+  document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  setPendingAvatarUrl(url);
 };
 
 window.selectAvatarPreset = (url, el) => {
-  selectedAvatarUrl = url;
+  setPendingAvatarUrl(url);
   document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
 };
 
 window.saveAvatar = async () => {
-  if (!selectedAvatarUrl) { toast('Pick an avatar first', '⚠️'); return; }
-  userProfile.avatarUrl = selectedAvatarUrl;
-  try { await setUserProfile(userProfile); applyProfileToUI(); closeModal('avatar-modal'); toast('Avatar updated!', '🖼'); }
-  catch (e) { toast('Error: ' + e.message, '❌'); }
+  const url = (window.__lvAvatarUrl || selectedAvatarUrl || '').trim();
+  if (!url) { toast('Pick an avatar first', '⚠️'); return; }
+  userProfile.avatarUrl = url;
+  setPendingAvatarUrl(url);
+  try {
+    await setUserProfile(userProfile);
+    window.userProfile = userProfile;
+    const authorName = userProfile.displayName || currentUser?.displayName || 'Anonymous';
+    const authorUsername = userProfile.username ||
+      authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user';
+    await syncCommunityPostsAuthorFields(currentUser.uid, {
+      authorName,
+      authorAvatar: url,
+      authorUsername
+    });
+    try {
+      await updateProfile(currentUser, { photoURL: url });
+      window.currentUser = auth.currentUser;
+    } catch (e) { console.warn('Auth profile photoURL:', e.message); }
+    applyProfileToUI();
+    closeModal('avatar-modal');
+    toast('Avatar updated!', '🖼');
+  } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
 /* ══ COVER MODAL ═════════════════════════════════════════════ */
@@ -1964,6 +2210,7 @@ window.saveCover = async () => {
   userProfile.coverGradient = selectedCoverData.value;
   try {
     await setUserProfile(userProfile);
+    window.userProfile = userProfile;
     const cover = document.getElementById('profile-cover-display');
     if (cover) cover.style.background = selectedCoverData.value;
     closeModal('cover-modal');

@@ -6,7 +6,13 @@
 
 <div id="sidebar" class="sidebar">
     <button class="sidebar-close-btn" onclick="closeSidebar()">✕</button>
-    <div class="sidebar-logo">LifeVault</div>
+    <a class="sidebar-logo" style="cursor:pointer" href="#" onclick="event.preventDefault(); if(typeof navigateTo==='function')navigateTo('dashboard',event);"
+       aria-label="LifeVault — Dashboard">
+        <img class="sidebar-logo-img" src="{{ asset('logo.png') }}" alt="" width="32" height="32">
+        <span class="sidebar-logo-wordmark">
+            <span class="sidebar-logo-life">Life</span><span class="sidebar-logo-vault">Vault</span>
+        </span>
+    </a>
 
     <div class="nav-section-label">Overview</div>
     <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard', event)"><span class="nav-icon">🏠</span> Dashboard</div>
