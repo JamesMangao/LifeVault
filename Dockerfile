@@ -17,8 +17,6 @@ RUN apt-get update && apt-get install -y \
     poppler-utils \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd pdo_mysql zip bcmath \
-    && pecl install grpc \
-    && docker-php-ext-enable grpc \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
