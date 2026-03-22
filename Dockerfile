@@ -29,6 +29,10 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
+RUN cp .env.example .env
+
+RUN php artisan key:generate --force
+
 # Install PHP dependencies (ignore platform reqs for GD? No, we have it)
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
