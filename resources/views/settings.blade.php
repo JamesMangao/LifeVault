@@ -1296,7 +1296,18 @@
   let _acceptingChanges = false;
 
   window.onSettingChange = function() {
-    if (_acceptingChanges) showBar();
+    if (_acceptingChanges) {
+      showBar();
+      if (window.applyGlobalSettings) {
+        const s = currentState();
+        window.applyGlobalSettings({
+          appearance: {
+            theme: s.theme, font: s.font, fontSize: s.fontSize,
+            grid: s.fxGrid, glow: s.fxGlow, reduceMotion: s.fxReduceMotion
+          }
+        });
+      }
+    }
   };
 
   /* ── Silent toggle setter (replaces node to skip events) ── */
@@ -1480,12 +1491,17 @@
     _savedState = currentState();
     attachListeners();
 
-    // Apply the current theme (default or loaded)
-    const currentTheme = document.querySelector('.s-theme-card.active')?.dataset.theme || 'dark';
-    if (window.applyTheme) window.applyTheme(currentTheme);
+    // Apply the current settings
+    if (window.applyGlobalSettings) {
+      const s = currentState();
+      window.applyGlobalSettings({
+        appearance: {
+          theme: s.theme, font: s.font, fontSize: s.fontSize,
+          grid: s.fxGrid, glow: s.fxGlow, reduceMotion: s.fxReduceMotion
+        }
+      });
+    }
 
-    // Two rAF frames to let the browser finish rendering before we
-    // open the gate — prevents the load itself from triggering showBar
     requestAnimationFrame(() => requestAnimationFrame(() => {
       _acceptingChanges = true;
       hideBar();
@@ -1555,8 +1571,8 @@
         window.userProfile.showInCommunity = data.privacy.community;
       }
 
-      // Snapshot the newly-saved state so discard works correctly
-      _savedState = currentState();
+      // Apply settings immediately
+      if (window.applyGlobalSettings) window.applyGlobalSettings(data);
 
       window.toast?.('Settings saved! ✨', '✅');
       return true;

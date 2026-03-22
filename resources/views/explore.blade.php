@@ -22,7 +22,7 @@
         .explore-container { max-width: 800px; margin: 100px auto 40px; padding: 0 20px; }
         .explore-header { text-align: center; margin-bottom: 48px; }
         .explore-title { font-size: 2.8rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: 12px; }
-        .explore-subtitle { font-family: 'Newsreader', serif; font-style: italic; font-size: 1.1rem; color: #8892b0; font-weight: 300; }
+        .explore-subtitle { font-family: var(--font-journal); font-style: italic; font-size: 1.1rem; color: #8892b0; font-weight: 300; }
         .join-nudge {
             background: linear-gradient(135deg, rgba(79,142,247,.1), rgba(167,139,250,.1));
             border: 1px solid rgba(79,142,247,.2); border-radius: 24px;
@@ -56,7 +56,7 @@
         .badge-goal    { background:rgba(167,139,250,.15); color:#a78bfa; }
         .post-time  { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:#6b7a99; }
         .post-title { font-size:.95rem; font-weight:700; margin-bottom:8px; line-height:1.3; color:#e8eaf0; }
-        .post-body  { font-family:'Newsreader',serif; font-size:.9rem; line-height:1.7; color:rgba(232,234,240,.75); font-weight:300; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+        .post-body  { font-family:var(--font-journal); font-size:var(--font-size-journal); line-height:1.7; color:rgba(232,234,240,.75); font-weight:300; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
         .post-goal-bar  { background:rgba(255,255,255,.06); border-radius:99px; height:6px; overflow:hidden; margin:8px 0; }
         .post-goal-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#4f8ef7,#a78bfa); }
         .post-goal-meta { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:.62rem; color:#6b7a99; margin-top:4px; }
@@ -72,7 +72,7 @@
         .lv-btn-primary {
             background: linear-gradient(135deg,#7c3aed,#4338ca); color: white; border: none;
             padding: 12px 24px; border-radius: 12px; font-weight: 700;
-            font-family: 'Syne', sans-serif; cursor: pointer; transition: all .2s;
+            cursor: pointer; transition: all .2s;
             text-decoration: none; display: inline-block; box-shadow: 0 4px 20px rgba(124,58,237,.3);
         }
         .lv-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,.5); }

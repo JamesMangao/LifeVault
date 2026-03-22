@@ -217,7 +217,7 @@
         </div>
         <div id="lv-chatbot-messages"></div>
         <div id="lv-chatbot-faqs">
-            <div class="lv-faq-track lv-track-left" style="animation-duration:50s">
+            <div class="lv-faq-track lv-track-left" style="animation-duration:25s">
                 <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
                 <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
                 <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
@@ -227,7 +227,7 @@
                 <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
                 <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
             </div>
-            <div class="lv-faq-track lv-track-right" style="animation-duration:45s">
+            <div class="lv-faq-track lv-track-right" style="animation-duration:20s">
                 <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
                 <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
                 <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
@@ -467,6 +467,27 @@
      ALL PAGE STYLES
 ═══════════════════════════════════════════════════════════ --}}
 <style>
+:root {
+    --font-journal: 'Newsreader', serif;
+    --font-size-journal: 16px;
+}
+body.fx-reduce-motion *, body.fx-reduce-motion *::before, body.fx-reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+}
+body.fx-grid .lv-bg::after {
+    content: ''; position: absolute; inset: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 1;
+}
+body.fx-glow .lv-card:hover {
+    box-shadow: 0 0 50px rgba(79,142,247,.15), 0 0 0 1px rgba(79,142,247,.1);
+}
 
 /* ── Loading Screen ─────────────────────────────────────── */
 #loading {
@@ -687,7 +708,7 @@
 
 /* Motivation line — Newsreader italic, matches hero sub */
 .dash-motivation {
-    font-family: 'Newsreader', serif;
+    font-family: var(--font-journal);
     font-style: italic;
     font-size: .88rem;
     color: var(--muted);
@@ -835,7 +856,7 @@
 .lv-faq-item:hover{background:rgba(124,58,237,.25);border-color:rgba(167,139,250,.6);color:#fff;transform:translateY(-1px)}
 .lv-chat-msg{display:flex;gap:8px;animation:lv-fadeup .25s ease}
 .lv-chat-msg.lv-chat-user{flex-direction:row-reverse}
-.lv-chat-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:.82rem;line-height:1.6;font-family:'Newsreader',serif}
+.lv-chat-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:var(--font-size-journal);line-height:1.6;font-family:var(--font-journal)}
 .lv-chat-bubble strong{font-weight:700;color:#f0f2ff}
 .lv-chat-bubble em{font-style:italic;color:#c4b5fd}
 .lv-chat-bubble ul{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:5px}
@@ -856,7 +877,7 @@
 .lv-chat-typing span:nth-child(3){animation-delay:.3s}
 @keyframes lv-typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
 #lv-chatbot-input-area{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);flex-shrink:0}
-#lv-chatbot-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:99px;padding:10px 16px;font-size:.82rem;color:#f0f2ff;font-family:'Newsreader',serif;outline:none;transition:border-color .2s,box-shadow .2s}
+#lv-chatbot-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:99px;padding:10px 16px;font-size:.82rem;color:#f0f2ff;font-family:var(--font-journal);outline:none;transition:border-color .2s,box-shadow .2s}
 #lv-chatbot-input::placeholder{color:#4a5270}
 #lv-chatbot-input:focus{border-color:rgba(124,58,237,.5);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
 #lv-chatbot-send{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,#7c3aed,#4f8ef7);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .2s,box-shadow .2s}
@@ -914,6 +935,53 @@
 <script src="{{ asset('js/app.js') }}?v={{ time() }}" type="module"></script>
 <script src="{{ asset('js/profile-popup.js') }}?v={{ time() }}"></script>
 @stack('scripts')
+<script>
+window.applyGlobalSettings = function(s) {
+    if (!s) return;
+    const root = document.documentElement;
+    const body = document.body;
+    
+    // Theme
+    if (s.appearance?.theme && window.applyTheme) {
+        window.applyTheme(s.appearance.theme);
+    }
+    
+    // Fonts
+    if (s.appearance?.font) {
+        root.style.setProperty('--font-journal', s.appearance.font + ', serif');
+    }
+    if (s.appearance?.fontSize) {
+        root.style.setProperty('--font-size-journal', s.appearance.fontSize + 'px');
+    }
+    
+    // Visual Effects
+    if (s.appearance) {
+        body.classList.toggle('fx-grid', !!s.appearance.grid);
+        body.classList.toggle('fx-glow', !!s.appearance.glow);
+        body.classList.toggle('fx-reduce-motion', !!s.appearance.reduceMotion);
+    }
+};
+
+// Hook into onAuthStateChanged to load settings
+document.addEventListener('DOMContentLoaded', () => {
+    const checkAuth = setInterval(() => {
+        if (window.auth && window.db && window._fbFS) {
+            clearInterval(checkAuth);
+            window.auth.onAuthStateChanged(async user => {
+                if (user) {
+                    try {
+                        const { getDoc, doc } = window._fbFS;
+                        const snap = await getDoc(doc(window.db, 'settings', user.uid));
+                        if (snap.exists()) {
+                            window.applyGlobalSettings(snap.data());
+                        }
+                    } catch (e) { console.warn('Global settings load error:', e); }
+                }
+            });
+        }
+    }, 100);
+});
+</script>
 
 <div id="profile-popup">
     <div class="pp-header">

@@ -40,7 +40,7 @@
     <svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="text" id="saved-search" placeholder="Search saved items…"
            oninput="savedSearchItems(this.value)"
-           style="width:100%;box-sizing:border-box;padding:11px 14px 11px 38px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-family:'Newsreader',serif;font-size:.9rem;font-weight:300;outline:none;transition:border-color .2s,box-shadow .2s"
+           style="width:100%;box-sizing:border-box;padding:11px 14px 11px 38px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--font-journal);font-size:.9rem;font-weight:300;outline:none;transition:border-color .2s,box-shadow .2s"
            onfocus="this.style.borderColor='rgba(79,142,247,.5)';this.style.boxShadow='0 0 0 3px rgba(79,142,247,.08)'"
            onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
   </div>
@@ -49,7 +49,7 @@
   <div id="saved-empty" style="text-align:center;padding:80px 24px">
     <div style="font-size:3.5rem;margin-bottom:16px;opacity:.25">🔖</div>
     <div style="font-size:.95rem;font-weight:700;color:var(--muted);margin-bottom:10px">Nothing saved yet</div>
-    <div style="font-family:'Newsreader',serif;font-style:italic;font-size:.85rem;color:var(--muted);opacity:.6;max-width:360px;margin:0 auto 28px;line-height:1.7">
+    <div style="font-family:var(--font-journal);font-style:italic;font-size:.85rem;color:var(--muted);opacity:.6;max-width:360px;margin:0 auto 28px;line-height:1.7">
       Use the Save button in the Resume Analyzer, Life Story Generator, or Shadow Self Analyzer to bookmark your results here.
     </div>
     <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
@@ -123,7 +123,7 @@
 
     <div id="saved-modal-body"
          style="flex:1;overflow-y:auto;padding:22px;
-                font-family:'Newsreader',serif;font-size:.88rem;line-height:1.87;
+                font-family:var(--font-journal);font-size:var(--font-size-journal);line-height:1.87;
                 color:rgba(232,234,240,.82);font-weight:300;
                 scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent"></div>
 
@@ -591,7 +591,7 @@ function buildResumeCard(item) {
     + '<span class="saved-score-pill" style="background:' + sb + ';border:1px solid ' + sr + ';color:' + sc + '"><span style="font-size:.8rem;font-weight:900">' + s + '</span><span style="opacity:.6">/100</span></span>'
     + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:' + sc + ';text-transform:uppercase;letter-spacing:.08em">' + lbl + '</span>'
     + '</div>'
-    + (preview ? '<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
+    + (preview ? '<div style="font-family:var(--font-journal);font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
     + '</div>'
     + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
@@ -617,7 +617,7 @@ function buildStoryCard(item) {
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
     + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">' + wc + ' words</span>' + themes
     + '</div>'
-    + '<div style="font-family:\'Newsreader\',serif;font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + (preview.length >= 240 ? '…' : '') + '</div>'
+    + '<div style="font-family:var(--font-journal);font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + (preview.length >= 240 ? '…' : '') + '</div>'
     + '</div>'
     + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'Read Full Story')
     + '<button onclick="event.stopPropagation();savedCopyStory(\'' + item.id + '\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.25);color:var(--lavender)">📋 Copy</button>'
@@ -648,7 +648,7 @@ function buildShadowCard(item) {
     + '<div style="text-align:center;flex-shrink:0">'
     + '<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">' + score + '%</div>'
     + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Awareness</div></div>'
-    + '<div style="flex:1;font-family:\'Newsreader\',serif;font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.6;font-weight:300">' + esc(item.summaryText || '') + '</div>'
+    + '<div style="flex:1;font-family:var(--font-journal);font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.6;font-weight:300">' + esc(item.summaryText || '') + '</div>'
     + '</div>'
     + '<div style="display:flex;gap:5px;flex-wrap:wrap">' + badges + '</div>'
     + '</div>'
@@ -676,7 +676,7 @@ function buildHolisticCard(item) {
     + '<span class="saved-score-pill" style="background:' + m.bg + ';border:1px solid ' + m.br + ';color:' + m.color + '"><span style="font-size:.8rem;font-weight:900">' + s + '</span><span style="opacity:.6">/100</span></span>'
     + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:' + m.color + ';text-transform:uppercase;letter-spacing:.08em">' + m.lbl + '</span>'
     + '</div>'
-    + (preview ? '<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
+    + (preview ? '<div style="font-family:var(--font-journal);font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
     + '</div>'
     + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
@@ -692,7 +692,7 @@ function buildGenericCard(item) {
     + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + esc(item.type || 'unknown') + ' · ' + relTime(item.savedAt) + '</div></div>'
     + '<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">' + esc(item.type || 'item') + '</span>'
     + '</div>'
-    + (preview ? '<div class="saved-body"><div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '</div></div>' : '')
+    + (preview ? '<div class="saved-body"><div style="font-family:var(--font-journal);font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '</div></div>' : '')
     + '<div class="saved-footer" onclick="event.stopPropagation()">' + delBtn(item.id) + '</div></div>';
 }
 
