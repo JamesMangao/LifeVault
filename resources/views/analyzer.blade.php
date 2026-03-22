@@ -722,8 +722,14 @@ form.addEventListener('submit', function(e){
   const timer = startSteps();
 
   fetch('{{ route("analyze.resume.ajax") }}', {
-    method:'POST', body: new FormData(form),
-    headers:{ 'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value }
+    method: 'POST',
+    body: new FormData(form),
+    headers: {
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || '',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    credentials: 'same-origin'
   })
   .then(async res => {
     const j = await res.json().catch(() => ({ message:'Unknown error' }));

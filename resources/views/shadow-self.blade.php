@@ -162,8 +162,11 @@ window.analyzeShadowSelf = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        'X-Requested-With': 'XMLHttpRequest'
       },
+      credentials: 'same-origin',
       body: JSON.stringify({ entries: formattedEntries }),
     });
 

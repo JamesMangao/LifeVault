@@ -344,7 +344,9 @@ Begin now with the TITLE: line, then the five paragraphs.`;
           'Content-Type': 'application/json',
           'Accept':       'application/json',
           'X-CSRF-TOKEN': CSRF_TOKEN,
+          'X-Requested-With': 'XMLHttpRequest'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           prompt:     buildPrompt(entries),
           max_tokens: 1400,

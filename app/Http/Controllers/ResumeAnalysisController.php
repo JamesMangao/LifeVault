@@ -117,21 +117,24 @@ class ResumeAnalysisController extends Controller
 
             @unlink($tempPath);
 
-            // 3️⃣ Save to DB
-            $insertResult = DB::select('CALL usp_insert_resume(?, ?, ?)', [
-                1,
-                $resumeContent,
-                $request->job_description
-            ]);
+            // 3️⃣ Save to DB - Wrapped in try-catch for resilience
+            try {
+                $insertResult = DB::select('CALL usp_insert_resume(?, ?, ?)', [
+                    1,
+                    $resumeContent,
+                    $request->job_description
+                ]);
 
-            $newId  = $insertResult[0]->inserted_id;
-            $result = DB::select('CALL usp_get_resume(?, ?)', [1, $newId]);
-
-            if (!$result) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No resume found'
-                ], 500);
+                if ($insertResult && isset($insertResult[0]->inserted_id)) {
+                    $newId  = $insertResult[0]->inserted_id;
+                    $result = DB::select('CALL usp_get_resume(?, ?)', [1, $newId]);
+                    if (!$result) {
+                        Log::warning('usp_get_resume returned no data for id: ' . $newId);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error('Database error in ResumeAnalysis (falling back to AI-only): ' . $e->getMessage());
+                // We proceed without DB record as Firestore handles user-facing "saved items"
             }
 
             // 4️⃣ Clean resume text for AI prompt

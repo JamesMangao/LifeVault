@@ -637,7 +637,13 @@ window.holisticCareerAnalyze = async function() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         const response = await fetch('/ai/holistic-career/analyze', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
             body: JSON.stringify({ resume_text: resumeText, job_title_target: jobTarget, journal_entries: entries }),
         });
         const data = await response.json();
