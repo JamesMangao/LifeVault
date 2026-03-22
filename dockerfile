@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd \
-    && docker-php-ext-install pdo_mysql   # optional
+    && docker-php-ext-install pdo_mysql   # optional, but harmless
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -23,16 +23,16 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Create SQLite database file (if not already in repo)
+# Create the SQLite database file (so Laravel doesn't complain)
 RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
 
 # Install PHP dependencies
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
-# Generate app key (optional – can be set via environment)
+# Generate a new app key (optional – you can also set it via environment)
 RUN php artisan key:generate --force
 
-# Set permissions
+# Set permissions for storage, cache, and database
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 # Enable Apache mod_rewrite
