@@ -1,18 +1,19 @@
 # Use official PHP 8.3 with Apache
 FROM php:8.3-apache
 
-# Install system dependencies and GD extension
+# Install system dependencies for PHP extensions
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
+    libzip-dev \
     zip \
     unzip \
     git \
     curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd \
-    && docker-php-ext-install pdo_mysql   # optional, but harmless
+    && docker-php-ext-install gd zip pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -23,17 +24,14 @@ WORKDIR /var/www/html
 # Copy all application files
 COPY . .
 
-# Create the SQLite database file (so Laravel doesn't complain)
-RUN mkdir -p /var/www/html/database && touch /var/www/html/database/database.sqlite
-
-# Install PHP dependencies
+# Install PHP dependencies (ignore platform reqs for GD? No, we have it)
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 
-# Generate a new app key (optional – you can also set it via environment)
+# Generate a new app key (optional – you can also set via env)
 RUN php artisan key:generate --force
 
-# Set permissions for storage, cache, and database
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+# Set permissions for storage and bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
