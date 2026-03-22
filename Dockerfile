@@ -43,13 +43,14 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
-# Configure MPM: Disable event/worker and ensure prefork is enabled for PHP
-RUN (a2dismod mpm_event || true) \
-    && (a2dismod mpm_worker || true) \
+# Configure MPM: Robustly disable event/worker and ensure prefork is enabled for PHP
+RUN a2dismod mpm_event mpm_worker || true \
     && a2enmod mpm_prefork
 
-# Configure Apache to serve from the public folder
-RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
+# Configure Apache to listen on port 8080 (matching Railway expectation)
+RUN sed -i 's/Listen 80/Listen 8080/g' /etc/apache2/ports.conf \
+    && sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf \
+    && sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
 # Allow .htaccess files
 RUN echo '<Directory /var/www/html/public>' >> /etc/apache2/apache2.conf \
@@ -58,7 +59,7 @@ RUN echo '<Directory /var/www/html/public>' >> /etc/apache2/apache2.conf \
     && echo '    Require all granted' >> /etc/apache2/apache2.conf \
     && echo '</Directory>' >> /etc/apache2/apache2.conf
 
-# Expose port 80
+# Expose port 8080
 EXPOSE 8080
 
 # Start Apache
