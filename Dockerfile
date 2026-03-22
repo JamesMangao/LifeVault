@@ -52,8 +52,9 @@ RUN sed -i 's/Listen 80/Listen 8080/g' /etc/apache2/ports.conf \
     && sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf \
     && sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
-# Allow .htaccess files
-RUN echo '<Directory /var/www/html/public>' >> /etc/apache2/apache2.conf \
+# Allow .htaccess files and suppress ServerName warning
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf \
+    && echo '<Directory /var/www/html/public>' >> /etc/apache2/apache2.conf \
     && echo '    Options Indexes FollowSymLinks' >> /etc/apache2/apache2.conf \
     && echo '    AllowOverride All' >> /etc/apache2/apache2.conf \
     && echo '    Require all granted' >> /etc/apache2/apache2.conf \
