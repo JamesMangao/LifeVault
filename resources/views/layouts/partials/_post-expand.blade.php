@@ -1,332 +1,348 @@
-<!DOCTYPE html>
-<!--
-  ═══════════════════════════════════════════════════════════════════
-  POST EXPAND OVERLAY for EXPLORE PAGE (GUEST-FRIENDLY)
-  ───────────────────────────────────────────────────────────────────
-  • View-only (no auth actions: likes/comments/edit/delete)
-  • Self-contained: own styles + JS, no app.css/app.js deps
-  • Mobile-first responsive
-  • Long bodies auto-truncate with "Read more"
-  • Photos zoomable
-  • Exposes: window.openExpandedPost(id), window.closeExpandedPost()
-  • Drop before </body> in explore.blade.php
-  ═══════════════════════════════════════════════════════════════════
--->
+{{--
+  _post-expand.blade.php — Guest explore post expand overlay.
+  Matches community.blade.php's post-expand-overlay exactly:
+  same DOM structure, same CSS classes, same open/close pattern.
+  Drop before </body> in explore.blade.php.
+--}}
 
-<style id="gexp-styles">
+{{-- ═══════════ EXPANDED POST OVERLAY (matches community.blade.php) ═══════════ --}}
+<div class="post-expand-overlay" id="post-expand-overlay-comm"
+     onclick="if(event.target===this)closeExpandedPost()">
+  <div class="post-expanded-card">
 
-  /* ── Keyframes ─────────────────────────────────────────── */
-  @keyframes gexpOverlayIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes gexpCardIn { 
-    from { opacity: 0; transform: translateY(28px) scale(.95); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  /* ── Overlay ───────────────────────────────────────────── */
-  #gexp-overlay {
-    position: fixed !important; inset: 0 !important; z-index: 99998 !important;
-    display: none !important; align-items: center; justify-content: center;
-    padding: 20px !important; cursor: pointer; box-sizing: border-box !important;
-  }
-  #gexp-overlay.gexp-open {
-    display: flex !important; background: rgba(5,6,15,.94) !important;
-    backdrop-filter: blur(24px) !important; animation: gexpOverlayIn .25s ease !important;
-  }
-
-  /* ── Card ───────────────────────────────────────────────── */
-  #gexp-card {
-    position: relative !important; background: rgba(13,17,23,.98) !important;
-    border: 1px solid rgba(255,255,255,.08) !important; border-radius: 24px !important;
-    max-width: 650px !important; width: 100% !important; max-height: 92vh !important;
-    display: flex; flex-direction: column; overflow: hidden !important;
-    cursor: default !important; box-shadow: 
-      0 0 0 1px rgba(255,255,255,.06),
-      0 0 60px rgba(0,0,0,.9),
-      inset 0 1px 0 rgba(255,255,255,.03) !important;
-    animation: gexpCardIn .4s cubic-bezier(.22,1,.36,1) !important;
-  }
-  #gexp-card::before {
-    content: &#39;&#39;; position: absolute; top: 0; left: 0; right: 0;
-    height: 1px; z-index: 1; background: linear-gradient(90deg,
-      transparent, rgba(79,142,247,.7) 35%, rgba(167,139,250,.8) 65%, transparent);
-  }
-
-  /* ── Header ─────────────────────────────────────────────── */
-  #gexp-head {
-    padding: 28px 30px 22px !important; border-bottom: 1px solid rgba(255,255,255,.06) !important;
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
-    background: linear-gradient(155deg, rgba(79,142,247,.06) 0%, transparent 70%);
-  }
-  #gexp-head-left { flex: 1; min-width: 0; }
-  #gexp-author-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  #gexp-avatar {
-    width: 44px !important; height: 44px !important; border-radius: 50% !important;
-    object-fit: cover !important; border: 2px solid rgba(255,255,255,.15) !important;
-    flex-shrink: 0 !important;
-  }
-  #gexp-author-name {
-    font-family: &#39;Syne&#39;, sans-serif !important; font-size: 1.1rem !important; font-weight: 800 !important;
-    color: rgba(232,234,240,.97) !important; cursor: pointer;
-  }
-  #gexp-author-handle {
-    font-family: &#39;JetBrains Mono&#39;, monospace !important; font-size: .7rem !important; color: rgba(174,184,210,.6) !important;
-  }
-  #gexp-badge {
-    font-size: .75rem !important; font-weight: 700 !important; padding: 4px 10px !important;
-    border-radius: 20px !important; background: rgba(79,142,247,.12) !important;
-    border: 1px solid rgba(79,142,247,.3) !important; color: #7ab4ff !important;
-  }
-  #gexp-time {
-    font-family: &#39;JetBrains Mono&#39;, monospace !important; font-size: .65rem !important;
-    color: rgba(174,184,210,.4) !important; letter-spacing: .08em !important; text-transform: uppercase !important;
-  }
-  #gexp-close { 
-    width: 36px !important; height: 36px !important; border-radius: 10px !important;
-    border: 1px solid rgba(255,255,255,.08) !important; background: rgba(255,255,255,.03) !important;
-    color: rgba(174,184,210,.4) !important; cursor: pointer; font-size: 1rem !important;
-    display: flex; align-items: center; justify-content: center; transition: all .2s !important;
-  }
-  #gexp-close:hover {
-    background: rgba(248,113,113,.12) !important; color: #f87171 !important;
-    transform: rotate(90deg) scale(1.05) !important;
-  }
-
-  /* ── Body ───────────────────────────────────────────────── */
-  #gexp-body {
-    flex: 1 !important; overflow-y: auto !important; padding: 30px !important;
-    scrollbar-width: thin !important; scrollbar-color: rgba(255,255,255,.1) transparent !important;
-  }
-  #gexp-body::-webkit-scrollbar { width: 5px; }
-  #gexp-body::-webkit-scrollbar-track { background: transparent; }
-  #gexp-body::-webkit-scrollbar-thumb { 
-    background: rgba(255,255,255,.12) !important; border-radius: 3px !important;
-  }
-  #gexp-title {
-    font-family: &#39;Syne&#39;, sans-serif !important; font-size: 1.4rem !important; font-weight: 800 !important;
-    line-height: 1.25 !important; margin-bottom: 18px !important; color: rgba(232,234,240,.97) !important;
-  }
-  #gexp-body-text {
-    font-family: &#39;Newsreader&#39;, serif !important; font-size: 1.05rem !important; line-height: 1.85 !important;
-    color: rgba(232,234,240,.82) !important; white-space: pre-wrap !important; word-break: break-word !important;
-    font-weight: 300 !important;
-  }
-  #gexp-read-more {
-    font-family: &#39;JetBrains Mono&#39;, monospace !important; font-size: .7rem !important; color: #7ab4ff !important;
-    cursor: pointer !important; margin-top: 8px !important; display: inline-block !important;
-    padding: 4px 12px !important; border-radius: 6px !important;
-    background: rgba(79,142,247,.08) !important; transition: all .2s !important;
-  }
-  #gexp-read-more:hover { background: rgba(79,142,247,.15) !important; transform: translateX(4px) !important; }
-  #gexp-photos {
-    display: grid !important; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-    gap: 12px !important; margin-top: 24px !important;
-  }
-  #gexp-photos img {
-    width: 100% !important; height: 140px !important; border-radius: 14px !important;
-    object-fit: cover !important; border: 1px solid rgba(255,255,255,.08) !important;
-    cursor: pointer !important; transition: all .25s !important;
-  }
-  #gexp-photos img:hover {
-    transform: scale(1.05) !important; border-color: rgba(79,142,247,.4) !important;
-    box-shadow: 0 12px 32px rgba(0,0,0,.6) !important;
-  }
-  #gexp-tags {
-    display: flex !important; gap: 8px !important; flex-wrap: wrap !important; margin-top: 22px !important;
-    padding-top: 18px !important; border-top: 1px solid rgba(255,255,255,.05) !important;
-  }
-  #gexp-tags span {
-    font-family: &#39;JetBrains Mono&#39;, monospace !important; font-size: .65rem !important; font-weight: 700 !important;
-    letter-spacing: .12em !important; text-transform: uppercase !important;
-    padding: 6px 12px !important; border-radius: 8px !important;
-    background: rgba(79,142,247,.1) !important; border: 1px solid rgba(79,142,247,.25) !important;
-    color: rgba(79,142,247,.95) !important;
-  }
-  #gexp-goal-bar {
-    height: 8px !important; background: rgba(255,255,255,.06) !important; border-radius: 4px !important;
-    overflow: hidden !important; margin: 12px 0 !important;
-  }
-  #gexp-goal-fill {
-    height: 100% !important; background: linear-gradient(90deg, #4f8ef7, #a78bfa) !important;
-    border-radius: 4px !important; transition: width .4s ease !important;
-  }
-
-  /* ── Footer (view stats only) ───────────────────────────── */
-  #gexp-footer {
-    padding: 18px 30px 24px !important; border-top: 1px solid rgba(255,255,255,.05) !important;
-    display: flex !important; align-items: center !important; gap: 12px !important;
-    background: rgba(0,0,0,.25) !important; font-family: &#39;JetBrains Mono&#39;, monospace !important;
-    font-size: .68rem !important; color: rgba(174,184,210,.35) !important;
-  }
-
-  /* ── Mobile ─────────────────────────────────────────────── */
-  @media (max-width: 768px) {
-    #gexp-overlay { padding: 12px !important; }
-    #gexp-head, #gexp-body, #gexp-footer { padding-left: 20px !important; padding-right: 20px !important; }
-    #gexp-title { font-size: 1.2rem !important; }
-    #gexp-photos { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important; }
-    #gexp-photos img { height: 110px !important; }
-  }
-  @media (max-width: 480px) {
-    #gexp-photos { grid-template-columns: repeat(2, 1fr) !important; }
-  }
-
-</style>
-
-<!-- Overlay DOM -->
-<div id="gexp-overlay">
-  <div id="gexp-card">
-    <!-- Header -->
-    <div id="gexp-head">
-      <div id="gexp-head-left">
-        <div id="gexp-author-row"></div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <span id="gexp-time"></span>
+    <div class="post-expanded-header">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
+        <img id="exp-avatar" src=""
+             style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(255,255,255,.1);flex-shrink:0"
+             onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
+        <div style="flex:1;min-width:0">
+          <div id="exp-author-row"
+               style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"></div>
+          <div id="exp-time"
+               style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#6b7a99;margin-top:2px"></div>
         </div>
       </div>
-      <button id="gexp-close" title="Close (Esc)">✕</button>
+      <button class="expanded-close-btn" onclick="closeExpandedPost()">✕</button>
     </div>
 
-    <!-- Body -->
-    <div id="gexp-body">
-      <div id="gexp-title"></div>
-      <div id="gexp-body-text"></div>
-      <span id="gexp-read-more" style="display: none;">Read more ↓</span>
-      <div id="gexp-photos" style="display: none;"></div>
-      <div id="gexp-goal-bar" style="display: none;">
-        <div id="gexp-goal-fill"></div>
-      </div>
-      <div id="gexp-tags" style="display: none;"></div>
+    <div class="post-expanded-body" id="exp-body"></div>
+
+    <div class="post-expanded-footer" id="exp-footer">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#4a5270;display:flex;align-items:center;gap:8px">
+        🔒 <span>Sign in to like, comment & share</span>
+      </span>
+      <button class="btn btn-primary" onclick="window.location.href='/'"
+              style="margin-left:auto;padding:7px 16px;font-size:.78rem">
+        Sign In →
+      </button>
     </div>
 
-    <!-- Footer -->
-    <div id="gexp-footer">
-      👁️ <span id="gexp-view-count">Viewing</span>
-    </div>
   </div>
 </div>
 
+<style>
+/* ── Match community.blade.php expand overlay styles exactly ── */
+@keyframes overlayFadeIn  { from{opacity:0}            to{opacity:1} }
+@keyframes expandCardIn   {
+    from { opacity:0; transform:scale(.88) translateY(24px); }
+    to   { opacity:1; transform:scale(1)   translateY(0);    }
+}
+
+.post-expand-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; align-items: center; justify-content: center; padding: 24px;
+}
+.post-expand-overlay.open {
+    display: flex;
+    background: rgba(11,15,26,.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    animation: overlayFadeIn .3s ease both;
+}
+.post-expanded-card {
+    background: #111827;
+    border: 1px solid rgba(79,142,247,.25);
+    border-radius: 20px;
+    max-width: 720px; width: 100%; max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 0 80px rgba(79,142,247,.12), 0 40px 80px rgba(0,0,0,.6);
+    animation: expandCardIn .38s cubic-bezier(.34,1.4,.64,1) both;
+    overflow: hidden;
+}
+.post-expanded-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(79,142,247,.06), rgba(167,139,250,.04));
+}
+.post-expanded-body {
+    padding: 24px; overflow-y: auto; flex: 1;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.08) transparent;
+}
+.post-expanded-body::-webkit-scrollbar       { width: 4px; }
+.post-expanded-body::-webkit-scrollbar-track { background: transparent; }
+.post-expanded-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+.post-expanded-footer {
+    padding: 14px 24px; flex-shrink: 0;
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(26,34,53,.6);
+}
+.expanded-close-btn {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    color: #6b7a99; cursor: pointer; font-size: .9rem;
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s; flex-shrink: 0;
+}
+.expanded-close-btn:hover {
+    color: #f87171; border-color: #f87171;
+    background: rgba(248,113,113,.08);
+    transform: rotate(90deg);
+}
+/* post-type badges (same as community) */
+.post-type-badge { font-family:'JetBrains Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;padding:2px 7px;border-radius:4px;font-weight:400 }
+.badge-journal   { background:rgba(79,142,247,.15); color:#4f8ef7 }
+.badge-task      { background:rgba(52,211,153,.15); color:#34d399 }
+.badge-goal      { background:rgba(167,139,250,.15);color:#a78bfa }
+/* post body text */
+.exp-body-text {
+    font-family: 'Newsreader', serif; font-size: 1rem; line-height: 1.85;
+    color: rgba(232,234,240,.82); white-space: pre-wrap; word-break: break-word;
+    font-weight: 300;
+}
+/* photo grid */
+.exp-photos {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+}
+.exp-photos img {
+    width: 120px; height: 120px; border-radius: 10px;
+    object-fit: cover; border: 1px solid rgba(255,255,255,.08);
+    cursor: pointer; transition: transform .2s, border-color .2s;
+}
+.exp-photos img:hover { transform: scale(1.04); border-color: #4f8ef7; }
+/* tags */
+.exp-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; }
+.exp-tags span {
+    font-family:'JetBrains Mono',monospace; font-size:.58rem;
+    padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:.08em;
+    background:rgba(79,142,247,.12); color:#4f8ef7;
+}
+/* goal bar */
+.exp-goal-bar { background:rgba(255,255,255,.06); border-radius:99px; height:6px; overflow:hidden; margin:10px 0; }
+.exp-goal-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#4f8ef7,#a78bfa); transition:width .6s cubic-bezier(.23,1,.32,1); }
+
+@media(max-width:640px) {
+    .post-expand-overlay   { padding: 12px; }
+    .post-expanded-header,
+    .post-expanded-body,
+    .post-expanded-footer  { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+
 <script>
-(function() {
-  &#39;use strict&#39;;
+(function(){
+    'use strict';
 
-  // Reuse relativeTime from explore page
-  window.relativeTime = window.relativeTime || function(ts) {
-    if(!ts) return &#39;just now&#39;;
-    const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
-    if(s < 60) return &#39;just now&#39;;
-    if(s < 3600) return Math.floor(s/60) + &#39;m ago&#39;;
-    if(s < 86400) return Math.floor(s/3600) + &#39;h ago&#39;;
-    return Math.floor(s/86400) + &#39;d ago&#39;;
-  };
+    var TYPE_BADGES      = {thought:'💭 Thought', journal:'📓 Journal', task:'✅ Task', goal:'🎯 Goal'};
+    var TYPE_BADGE_CLASS = {thought:'badge-journal', journal:'badge-journal', task:'badge-task', goal:'badge-goal'};
 
-  function el(id) { return document.getElementById(id); }
-  function esc(s) { 
-    const d = document.createElement(&#39;div&#39;); 
-    d.textContent = s; 
-    return d.innerHTML; 
-  }
-
-  // viewPhoto fallback
-  window.viewPhoto = window.viewPhoto || function(url) {
-    const modal = document.createElement(&#39;div&#39;);
-    modal.style.cssText = &#39;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px;&#39;;
-    modal.innerHTML = `<img src="${esc(url)}" style="max-width:95%;max-height:95%;border-radius:12px;"><button style="position:absolute;top:24px;right:28px;background:none;border:none;color:white;font-size:2.5rem;cursor:pointer;">×</button>`;
-    modal.onclick = e => { if(e.target === modal) modal.remove(); };
-    modal.lastElementChild.onclick = () => modal.remove();
-    document.body.appendChild(modal);
-  };
-
-  window.openExpandedPost = function(postId) {
-    const posts = window.explorePosts || []; // assume global from explore
-    const post = posts.find(p => p.id === postId);
-    if(!post) {
-      console.warn(&#39;[gexp] Post not found:&#39;, postId);
-      return;
+    function esc(s){
+        var d = document.createElement('div');
+        d.textContent = String(s || '');
+        return d.innerHTML;
     }
 
-    window._gexpPostId = postId;
+    function relativeTime(ts) {
+        if (!ts) return '';
+        // Handle Firestore Timestamps (have .toDate()) and plain dates/strings
+        var date = (ts && typeof ts.toDate === 'function') ? ts.toDate() : new Date(ts);
+        var diff = Date.now() - date.getTime();
+        var mins = Math.floor(diff / 60000);
+        if (mins < 1)  return 'just now';
+        if (mins < 60) return mins + 'm ago';
+        var hrs = Math.floor(mins / 60);
+        if (hrs  < 24) return hrs  + 'h ago';
+        var days = Math.floor(hrs / 24);
+        if (days < 7)  return days + 'd ago';
+        return date.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    }
 
-    // Header
-    el(&#39;gexp-avatar&#39;).src = post.authorAvatar || &#39;https://ui-avatars.com/api/?name=U&amp;background=4f8ef7&amp;color=fff&#39;;
-    el(&#39;gexp-time&#39;).textContent = relativeTime(post.createdAt);
-    
-    const handle = post.authorUsername || (post.authorName || &#39;user&#39;).toLowerCase().replace(/[^a-z0-9_]/g, &#39;&#39;);
-    el(&#39;gexp-author-row&#39;).innerHTML = 
-      `<span style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-weight: 700; font-size: .95rem;">${esc(post.authorName || &#39;Anonymous&#39;)}</span>
-        <span style="font-family: \'JetBrains Mono\', monospace; font-size: .68rem; opacity: .6;">@${handle}</span>
-       </span>
-       <span id="gexp-badge">${post.type?.charAt(0).toUpperCase() + post.type?.slice(1) || &#39;Post&#39;}</span>`;
+    function getHandle(p) {
+        return p.authorUsername ||
+               (p.authorName || 'anonymous').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) ||
+               'user';
+    }
 
-    // Body
-    if(post.title) el(&#39;gexp-title&#39;).textContent = post.title;
-    else el(&#39;gexp-title&#39;).style.display = &#39;none&#39;;
+    /* ─── viewPhoto ─── */
+    window.viewPhoto = window.viewPhoto || function(url) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999999;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:20px;';
+        var img = document.createElement('img');
+        img.src = url;
+        img.style.cssText = 'max-width:95%;max-height:95%;border-radius:12px;object-fit:contain;';
+        overlay.appendChild(img);
+        overlay.onclick = function(e) { if (e.target === overlay || e.target === img) overlay.remove(); };
+        document.body.appendChild(overlay);
+    };
 
-    let bodyText = post.body || &#39;&#39;;
-    const isLong = bodyText.length > 400;
-    el(&#39;gexp-body-text&#39;).innerHTML = isLong 
-      ? esc(bodyText.slice(0, 400)) + &#39;...&#39;
-      : esc(bodyText);
+    /* ─── openExpandedPost ─── */
+    window.openExpandedPost = function(postId) {
+        // Works for both explore (window.explorePosts) and community (window.feedPosts)
+        var posts = window.explorePosts || window.feedPosts || [];
+        var post  = posts.find(function(p){ return p.id === postId; });
+        if (!post) { console.warn('[post-expand] Post not found:', postId); return; }
 
-    // Read more toggle
-    const readMore = el(&#39;gexp-read-more&#39;);
-    if(isLong) {
-      readMore.style.display = &#39;inline-block&#39;;
-      readMore.onclick = function(e) {
-        e.stopPropagation();
-        el(&#39;gexp-body-text&#39;).innerHTML = esc(bodyText);
-        readMore.style.display = &#39;none&#39;;
-      };
-    } else readMore.style.display = &#39;none&#39;;
+        var handle = getHandle(post);
+        var bc     = TYPE_BADGE_CLASS[post.type] || 'badge-journal';
+        var badge  = TYPE_BADGES[post.type] || post.type;
 
-    // Goal progress
-    const goalBar = el(&#39;gexp-goal-bar&#39;);
-    if(post.type === &#39;goal&#39; &amp;&amp; post.progress) {
-      goalBar.style.display = &#39;block&#39;;
-      el(&#39;gexp-goal-fill&#39;).style.width = post.progress + &#39;%&#39;;
-    } else goalBar.style.display = &#39;none&#39;;
+        /* — Header — */
+        var avatar = document.getElementById('exp-avatar');
+        if (avatar) avatar.src = post.authorAvatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(post.authorName || 'U') + '&background=4f8ef7&color=fff');
 
-    // Photos
-    const photosDiv = el(&#39;gexp-photos&#39;);
-    const photos = post.photoUrls || [];
-    if(photos.length) {
-      photosDiv.style.display = &#39;grid&#39;;
-      photosDiv.innerHTML = photos.map(u => 
-        `<img src="${esc(u)}" loading="lazy" onclick="viewPhoto('${esc(u)}')">`
-      ).join(&#39;&#39;);
-    } else photosDiv.style.display = &#39;none&#39;;
+        var timeEl = document.getElementById('exp-time');
+        if (timeEl) {
+            var ts = post.createdAt;
+            if (ts && typeof ts.toDate === 'function') {
+                // Full date for expanded view, matching community
+                timeEl.textContent = ts.toDate().toLocaleDateString('en-US', {
+                    weekday:'short', month:'short', day:'numeric',
+                    year:'numeric', hour:'2-digit', minute:'2-digit'
+                });
+            } else if (ts) {
+                timeEl.textContent = relativeTime(ts);
+            } else {
+                timeEl.textContent = '';
+            }
+        }
 
-    // Tags
-    const tagsDiv = el(&#39;gexp-tags&#39;);
-    const tags = post.tags || [];
-    if(tags.length) {
-      tagsDiv.style.display = &#39;flex&#39;;
-      tagsDiv.innerHTML = tags.map(t => `<span>${esc(t)}</span>`).join(&#39;&#39;);
-    } else tagsDiv.style.display = &#39;none&#39;;
+        var authorRow = document.getElementById('exp-author-row');
+        if (authorRow) {
+            authorRow.innerHTML =
+                '<span style="font-family:\'Syne\',sans-serif;font-size:.9rem;font-weight:800;color:rgba(232,234,240,.97)">' + esc(post.authorName || 'Anonymous') + '</span>' +
+                '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.62rem;color:#6b7a99">@' + esc(handle) + '</span>' +
+                '<span class="post-type-badge ' + bc + '">' + badge + '</span>';
+        }
 
-    // Open
-    el(&#39;gexp-overlay&#39;).classList.add(&#39;gexp-open&#39;);
-    document.body.style.overflow = &#39;hidden&#39;;
-    el(&#39;gexp-body&#39;).scrollTop = 0;
-  };
+        /* — Body — */
+        var bodyHtml = '';
 
-  window.closeExpandedPost = function() {
-    const overlay = el(&#39;gexp-overlay&#39;);
-    if(!overlay?.classList.contains(&#39;gexp-open&#39;)) return;
-    overlay.style.opacity = &#39;0&#39;;
-    setTimeout(() => {
-      overlay.classList.remove(&#39;gexp-open&#39;);
-      document.body.style.overflow = &#39;&#39;;
-    }, 200);
-  };
+        if (post.title) {
+            bodyHtml += '<div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.3;color:rgba(232,234,240,.97)">' + esc(post.title) + '</div>';
+        }
 
-  // Event listeners
-  el(&#39;gexp-overlay&#39;).onclick = e => { if(e.target === el(&#39;gexp-overlay&#39;)) closeExpandedPost(); };
-  el(&#39;gexp-close&#39;).onclick = closeExpandedPost;
-  
-  document.addEventListener(&#39;keydown&#39;, e => {
-    if(e.key === &#39;Escape&#39;) closeExpandedPost();
-  });
+        if (post.type === 'goal') {
+            bodyHtml +=
+                '<div class="exp-goal-bar"><div class="exp-goal-fill" style="width:' + (post.progress || 0) + '%"></div></div>' +
+                '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:#6b7a99;margin-bottom:14px">' +
+                    '<span>' + esc(post.categoryIcon || '🎯') + ' ' + esc(post.title || '') + '</span>' +
+                    '<span>' + (post.progress || 0) + '% complete</span>' +
+                '</div>' +
+                (post.body ? '<div class="exp-body-text">' + esc(post.body) + '</div>' : '');
+
+        } else if (post.type === 'task') {
+            bodyHtml +=
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+                    '<span>' + esc(post.priorityIcon || '✅') + '</span>' +
+                    '<span style="font-size:.72rem;font-family:\'JetBrains Mono\',monospace;color:#6b7a99;text-transform:uppercase">' + esc(post.priority || '') + ' priority</span>' +
+                    (post.done ? '<span style="font-size:.72rem;font-family:\'JetBrains Mono\',monospace;color:#34d399">· Done ✓</span>' : '') +
+                '</div>' +
+                (post.body ? '<div class="exp-body-text">' + esc(post.body) + '</div>' : '');
+
+        } else {
+            // thought / journal — same layout as community openExpandedPost
+            if (post.moodEmoji) {
+                bodyHtml += '<div style="margin-bottom:12px;font-size:.8rem;color:#6b7a99;font-family:\'JetBrains Mono\',monospace">feeling ' + esc(post.moodEmoji) + '</div>';
+            }
+
+            bodyHtml += '<div class="exp-body-text">' + esc(post.body || '') + '</div>';
+
+            if (post.photoUrls && post.photoUrls.length) {
+                bodyHtml += '<div class="exp-photos">' +
+                    post.photoUrls.map(function(u){
+                        return '<img src="' + esc(u) + '" loading="lazy"' +
+                               ' onclick="event.stopPropagation();viewPhoto(\'' + esc(u) + '\')"' +
+                               ' onerror="this.style.display=\'none\'">';
+                    }).join('') +
+                '</div>';
+            }
+
+            if (post.tags && post.tags.length) {
+                bodyHtml += '<div class="exp-tags">' +
+                    post.tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') +
+                '</div>';
+            }
+        }
+
+        /* stat line matching community footer feel */
+        var likeCount    = (post.likes || []).length || 0;
+        var commentCount = post.commentCount || 0;
+        bodyHtml +=
+            '<div style="display:flex;gap:16px;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.05);' +
+                         'font-family:\'JetBrains Mono\',monospace;font-size:.65rem;color:#4a5270">' +
+                '<span>🤍 ' + likeCount    + ' like'    + (likeCount    !== 1 ? 's' : '') + '</span>' +
+                '<span>💬 ' + commentCount + ' comment' + (commentCount !== 1 ? 's' : '') + '</span>' +
+            '</div>';
+
+        var bodyEl = document.getElementById('exp-body');
+        if (bodyEl) { bodyEl.innerHTML = bodyHtml; bodyEl.scrollTop = 0; }
+
+        /* — Open — */
+        var overlay = document.getElementById('post-expand-overlay-comm');
+        if (overlay) {
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+    };
+
+    /* ─── closeExpandedPost ─── */
+    window.closeExpandedPost = function() {
+        var overlay = document.getElementById('post-expand-overlay-comm');
+        if (!overlay || !overlay.classList.contains('open')) return;
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+    };
+
+    /* ─── keyboard close ─── */
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') window.closeExpandedPost();
+    });
+
+    /* ─── patch explore cards after loadExploreFeed populates DOM ───
+       explore.blade.php calls renderExplorePost() which puts
+       onclick="if(typeof openExpandedPost==='function') openExpandedPost('id')"
+       directly on the card div — that already works, but we also
+       attach a MutationObserver so dynamically injected cards get
+       the same delegation treatment as community.blade.php uses.
+    ─────────────────────────────────────────────────────────────── */
+    function _patchExploreCards(root) {
+        (root || document).querySelectorAll('.post-card[data-post-id]').forEach(function(card) {
+            if (card.dataset.clickPatched === '1') return;
+            card.dataset.clickPatched = '1';
+            card.style.cursor = 'pointer';
+            var pid = card.getAttribute('data-post-id');
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('.post-action-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')) return;
+                window.openExpandedPost(pid);
+            });
+        });
+    }
+
+    function _startExploreObserver() {
+        var feedList = document.getElementById('feed-list');
+        if (!feedList) { setTimeout(_startExploreObserver, 100); return; }
+        _patchExploreCards(feedList);
+        new MutationObserver(function(){ _patchExploreCards(feedList); })
+            .observe(feedList, {childList: true, subtree: true});
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _startExploreObserver);
+    } else {
+        _startExploreObserver();
+    }
+
 })();
 </script>
-

@@ -113,13 +113,7 @@ function showAuth() {
   document.getElementById('app').style.display = 'none';
 }
 
-/* ══ SKELETON / OPTIMISTIC UI HELPERS ═══════════════════════════
-   - .skeleton CSS classes provide animated placeholders (added in app.css)
-   - use showSkeleton(container,count,template) to render placeholder items
-   - optimisticAction(fn,renderRevert) wraps async calls for immediate UI updates
-   - progressIllusion(element,start,finish) animates a fake progress bar
-*/
-
+/* ══ SKELETON / OPTIMISTIC UI HELPERS ═══════════════════════════ */
 window.showSkeleton = function (container, count = 1, template = null) {
   if (!container) return;
   const tpl = template || '<div class="skeleton-text"></div>';
@@ -131,12 +125,6 @@ window.hideSkeleton = function (container) {
   container.innerHTML = '';
 };
 
-/**
- * Call an async function while applying an optimistic UI change immediately.
- * @param {Function} fn - async function returning a promise
- * @param {Function} apply - invoked before fn to mutate UI optimistically
- * @param {Function} revert - invoked if fn rejects to roll back UI
- */
 window.optimisticUpdate = async function (fn, apply, revert) {
   try {
     if (apply) apply();
@@ -148,15 +136,12 @@ window.optimisticUpdate = async function (fn, apply, revert) {
   }
 };
 
-// simple progress illusion helper; call start() to add running class,
-// and finish() when operation completes.
 window.progressIllusion = function (el) {
   return {
     start() { el.classList.add('running'); },
     finish() { el.classList.remove('running'); }
   };
 };
-
 
 window.applyTheme = function (theme) {
   const root = document.documentElement;
@@ -259,7 +244,6 @@ async function loadAll() {
   if (!currentUser) return;
   const uid = currentUser.uid;
 
-  // show skeleton placeholders for lists while we fetch
   ['journal-list', 'tasks-high', 'tasks-med', 'tasks-low', 'goals-list'].forEach(id => {
     const el = document.getElementById(id);
     if (el) showSkeleton(el, 3, '<div class="skeleton-text" style="height:32px;margin:6px 0"></div>');
@@ -275,19 +259,15 @@ async function loadAll() {
     tasks = t.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
     goals = g.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() }));
 
-
     window.journals = journals;
     window.tasks = tasks;
     window.goals = goals;
 
-    // Expose data for Insights page (exact names required)
     window.journalEntries = journals;
     window.tasks = tasks;
     window.goals = goals;
 
-    // Trigger insights re-render
     window.dispatchEvent(new Event('insightsRefresh'));
-
 
     subscribeFeed();
     renderAll();
@@ -299,7 +279,6 @@ function updateGreeting() {
   const gEl = document.getElementById('greeting-time');
   if (gEl) {
     gEl.textContent = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
-    // if CSS is stale/hasn't reloaded, force the theme colour anyway
     gEl.style.color = 'var(--text)';
   }
   const dateEl = document.getElementById('today-date');
@@ -323,13 +302,15 @@ window.navigateTo = (page, event) => {
   }
 
   const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
-  if (navEl) {
-    navEl.classList.add('active');
-  }
+  if (navEl) navEl.classList.add('active');
 
   localStorage.setItem('lifeVaultLastPage', page);
 
   closeSidebar();
+
+  // ── FIX: dispatch pageChanged so blade partials (e.g. saved.blade.php) can react ──
+  document.dispatchEvent(new CustomEvent('pageChanged', { detail: page }));
+
   if (page === 'insights') renderInsights();
   if (page === 'community') {
     subscribeFeed();
@@ -339,8 +320,12 @@ window.navigateTo = (page, event) => {
   if (page === 'profile') renderProfilePage();
   if (page === 'settings') _settingsModule.load();
   if (page === 'shadow-self' || page === 'life-story') initializeLearningResources();
-};
 
+  // ── FIX: trigger saved render when navigating to saved page ──
+  if (page === 'saved' && typeof window._savedRender === 'function') {
+    setTimeout(window._savedRender, 50);
+  }
+};
 
 function restoreLastPage() {
   const lastPage = localStorage.getItem('lifeVaultLastPage') || 'dashboard';
@@ -652,15 +637,12 @@ function _showDeleteConfirmModal() {
 
 /* ══════════════════════════════════════════════════════════════
    JOURNAL EXPAND
-   ── Updated to use #jx-overlay and #jx-* element IDs
-   ── Matches journal-expand-overlay-FINAL.blade.php
 ══════════════════════════════════════════════════════════════ */
 window.openExpandedJournal = id => {
   const e = journals.find(j => j.id === id);
   if (!e) return;
   expandedJournalId = id;
 
-  // ── populate new jx-* elements ──────────────────────────────
   document.getElementById('jx-title').textContent = e.title || 'Untitled';
   document.getElementById('jx-date').textContent = fmtDate(e.createdAt);
   document.getElementById('jx-content').textContent = e.content || '';
@@ -674,14 +656,12 @@ window.openExpandedJournal = id => {
     moodEl.style.display = 'none';
   }
 
-  // word count
   const wcEl = document.getElementById('jx-wc');
   if (wcEl) {
     const n = (e.content || '').trim().split(/\s+/).filter(Boolean).length;
     wcEl.textContent = n + (n === 1 ? ' word' : ' words');
   }
 
-  // photos
   const photosEl = document.getElementById('jx-photos');
   if (e.photoUrls?.length) {
     photosEl.style.display = 'grid';
@@ -693,26 +673,21 @@ window.openExpandedJournal = id => {
     photosEl.innerHTML = '';
   }
 
-  // tags
   const tagsEl = document.getElementById('jx-tags');
   if (e.tags?.length) {
     tagsEl.style.display = 'flex';
-    tagsEl.innerHTML = e.tags.map(t =>
-      `<span>${esc(t)}</span>`
-    ).join('');
+    tagsEl.innerHTML = e.tags.map(t => `<span>${esc(t)}</span>`).join('');
   } else {
     tagsEl.style.display = 'none';
     tagsEl.innerHTML = '';
   }
 
-  // buttons
   const editBtn = document.getElementById('jx-edit-btn');
   if (editBtn) editBtn.onclick = () => { closeJournalExpand(); openJournalModal(id); };
 
   const delBtn = document.getElementById('jx-del-btn');
   if (delBtn) delBtn.onclick = () => { closeJournalExpand(); delJournal(id); };
 
-  // open overlay
   document.getElementById('jx-overlay').classList.add('jx-open');
   document.body.style.overflow = 'hidden';
   const body = document.getElementById('jx-body');
@@ -732,7 +707,6 @@ window.closeJournalExpand = () => {
     expandedJournalId = null;
   }, 170);
 };
-// aliases — keep any existing callers working
 window.closeExpandedJournal = window.closeJournalExpand;
 window.openJournalExpand = window.openExpandedJournal;
 
@@ -770,12 +744,10 @@ function initExpandableCards(container) {
       if (entryEl.classList.contains('journal-entry')) {
         const jid = entryEl.dataset.id || entryEl.dataset.journalId;
         if (jid) { window.openExpandedJournal(jid); return; }
-        // fallback: toggle preview expansion
         const preview = entryEl.querySelector('.entry-preview');
         if (preview) preview.classList.toggle('expanded');
       } else if (entryEl.classList.contains('post-card')) {
         const postId = entryEl.dataset.postId;
-        // The global openExpandedPost function handles all post types and pages (community vs profile)
         if (postId && typeof window.openExpandedPost === 'function') {
           window.openExpandedPost(postId);
         }
@@ -927,7 +899,6 @@ window.saveJournalEntry = async () => {
   if (bar) bar.start();
   try {
     if (editJournalId) {
-      // optimistic update: keep copy and apply change immediately
       const old = journals.find(j => j.id === editJournalId);
       await optimisticUpdate(async () => {
         await updateDoc(doc(db, 'users', currentUser.uid, 'journals', editJournalId), data);
@@ -943,18 +914,14 @@ window.saveJournalEntry = async () => {
       toast('Entry updated!', '📓');
     } else {
       data.createdAt = Timestamp.now();
-      // optimistic insert
       const fake = { id: '_optimistic', ...data, createdAt: new Date() };
       journals.unshift(fake);
       await optimisticUpdate(async () => {
         const r = await addDoc(collection(db, 'users', currentUser.uid, 'journals'), data);
-        // replace fake with real id
         const idx = journals.findIndex(j => j.id === '_optimistic');
         if (idx !== -1) journals[idx] = { id: r.id, ...data, createdAt: new Date() };
       },
-        () => { // revert
-          journals = journals.filter(j => j.id !== '_optimistic');
-        });
+        () => { journals = journals.filter(j => j.id !== '_optimistic'); });
       toast('Entry saved! ✨', '📓');
     }
     closeModal('journal-modal'); renderAll(); editJournalId = null;
@@ -1323,7 +1290,6 @@ function renderAll() {
 ══════════════════════════════════════════════════════════════ */
 function subscribeFeed() {
   if (feedUnsubscribe) return;
-  // clear previous posts so skeletons can appear
   window.feedPosts = undefined;
   renderFeed();
 
@@ -1353,19 +1319,19 @@ window.setComposerType = type => {
   document.querySelectorAll('.composer-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
 };
 
+// ── FIX: renamed inner `cu` → `_cu` to prevent collision with Firebase compiled internals ──
 window.postThought = async () => {
   const text = document.getElementById('composer-text').value.trim();
   if (!text) { toast('Write something first!', '✍️'); return; }
-  const cu = window.currentUser;
-  if (!cu) return;
+  const _cu = window.currentUser;
+  if (!_cu) return;
   const p = window.userProfile || {};
-  // FIXED: Prioritize freshest profile data to prevent stale name/pic in new posts
-  const authorName = p.displayName || cu.displayName || 'Anonymous';
-  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+  const authorName = p.displayName || _cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || _cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   try {
     await addDoc(collection(db, 'community_posts'), {
       type: 'thought', body: text, title: '',
-      authorId: cu.uid, authorName, authorAvatar,
+      authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, createdAt: serverTimestamp()
     });
@@ -1419,19 +1385,20 @@ window.openShareModal = (type = 'journal') => {
   document.getElementById('share-modal').classList.add('open');
 };
 
+// ── FIX: renamed inner `cu` → `_cu` ──
 window.shareJournal = async id => {
   if (!currentUser) { toast('Please wait, user not ready.', '⏳'); return; }
   const e = journals.find(j => j.id === id); if (!e) return;
-  const cu = window.currentUser;
+  const _cu = window.currentUser;
   const p = window.userProfile || {};
-  const authorName = p.displayName || cu.displayName || 'Anonymous';
-  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+  const authorName = p.displayName || _cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || _cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   try {
     await addDoc(collection(db, 'community_posts'), {
       type: 'journal', title: e.title || 'Untitled', body: e.content || '', mood: e.mood || 3,
       moodEmoji: e.moodEmoji || '😐', tags: e.tags || [], photoUrls: (e.photoUrls || []).slice(0, 3),
-      authorId: cu.uid, authorName, authorAvatar,
+      authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, createdAt: serverTimestamp()
     });
@@ -1439,18 +1406,19 @@ window.shareJournal = async id => {
   } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
+// ── FIX: renamed inner `cu` → `_cu` ──
 window.shareTask = async id => {
   const t = tasks.find(t => t.id === id); if (!t) return;
-  const cu = window.currentUser;
+  const _cu = window.currentUser;
   const p = window.userProfile || {};
-  const authorName = p.displayName || cu.displayName || 'Anonymous';
-  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+  const authorName = p.displayName || _cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || _cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   const PI = { high: '🔴', med: '🟡', low: '🟢' };
   try {
     await addDoc(collection(db, 'community_posts'), {
       type: 'task', title: t.text, body: t.note || '', priority: t.priority, priorityIcon: PI[t.priority] || '✅', done: t.done || false,
-      authorId: cu.uid, authorName, authorAvatar,
+      authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, createdAt: serverTimestamp()
     });
@@ -1458,17 +1426,18 @@ window.shareTask = async id => {
   } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
+// ── FIX: renamed inner `cu` → `_cu` ──
 window.shareGoal = async id => {
   const g = goals.find(g => g.id === id); if (!g) return;
-  const cu = window.currentUser;
+  const _cu = window.currentUser;
   const p = window.userProfile || {};
-  const authorName = p.displayName || cu.displayName || 'Anonymous';
-  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+  const authorName = p.displayName || _cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || _cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   closeModal('share-modal');
   try {
     await addDoc(collection(db, 'community_posts'), {
       type: 'goal', title: g.name, body: g.target || '', category: g.category, categoryIcon: CAT_ICONS[g.category] || '⭐', progress: g.progress || 0,
-      authorId: cu.uid, authorName, authorAvatar,
+      authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, createdAt: serverTimestamp()
     });
@@ -1478,9 +1447,9 @@ window.shareGoal = async id => {
 
 function renderFeed() {
   const container = document.getElementById('feed-list');
-  let posts = [...feedPosts];
+  let posts = [...(feedPosts || [])];
   if (currentFeedFilter !== 'all') {
-    if (currentFeedFilter === 'mine') posts = posts.filter(p => p.authorId === currentUser.uid);
+    if (currentFeedFilter === 'mine') posts = posts.filter(p => p.authorId === currentUser?.uid);
     else posts = posts.filter(p => p.type === currentFeedFilter);
   }
   if (!posts.length) {
@@ -1537,7 +1506,7 @@ function renderPostCard(p) {
       <button class="post-action-btn" onclick="repost('${p.id}')">🔁 <span class="post-action-count">${p.repostCount || ''}</span></button>
     </div>
     <div class="comments-section" id="comments-${p.id}" style="display:none">
-      <div id="comments-list-${p.id}"></div><!-- skeleton will be added by loadComments -->
+      <div id="comments-list-${p.id}"></div>
       <div class="comment-input-row">
         <img src="${esc(currentUser?.photoURL || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff')}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border);flex-shrink:0">
         <input class="comment-input" id="comment-input-${p.id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${p.id}')}">
@@ -1631,18 +1600,19 @@ window.deleteComment = async (postId, commentId) => {
   } catch (e) { toast('Error: ' + e.message, '❌'); }
 };
 
+// ── FIX: renamed inner `cu` → `_cu` ──
 window.repost = async postId => {
   const post = feedPosts.find(p => p.id === postId); if (!post) return;
   if (post.authorId === currentUser.uid) { toast('Cannot repost your own post', '⚠️'); return; }
-  const cu = window.currentUser;
+  const _cu = window.currentUser;
   const p = window.userProfile || {};
-  const authorName = p.displayName || cu.displayName || 'Anonymous';
-  const authorAvatar = p.avatarUrl || cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+  const authorName = p.displayName || _cu.displayName || 'Anonymous';
+  const authorAvatar = p.avatarUrl || _cu.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
   try {
     await addDoc(collection(db, 'community_posts'), {
       ...post, id: undefined, isRepost: true,
       originalAuthorName: post.authorName, originalAuthorAvatar: post.authorAvatar,
-      authorId: cu.uid, authorName, authorAvatar,
+      authorId: _cu.uid, authorName, authorAvatar,
       authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
       likes: [], commentCount: 0, repostCount: 0, createdAt: serverTimestamp()
     });
@@ -1673,25 +1643,17 @@ function relativeTime(date) {
 
 /* ══════════════════════════════════════════════════════════════
    USER PROFILE MODAL
-   ── IDs match your blade's user-profile-modal partial:
-      #user-profile-modal (.user-profile-modal-backdrop)
-      #upm-cover / #upm-avatar / #upm-name / #upm-username
-      #upm-bio / #upm-info / #upm-posts / #upm-likes
-      #upm-joined / #upm-posts-list
 ══════════════════════════════════════════════════════════════ */
 window.openUserProfileModal = async (userId) => {
   if (!userId) return;
   const modal = document.getElementById('user-profile-modal');
   if (!modal) return;
 
-  // open immediately, populate while loading
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  // reset state
-  // use skeletons rather than plain text
   set('upm-name', '');
   set('upm-username', '');
   set('upm-bio', '');
@@ -1712,7 +1674,6 @@ window.openUserProfileModal = async (userId) => {
   if (avatarEl) avatarEl.src = '';
 
   try {
-    // load profile sub-doc first, fall back to users doc
     const [profileSnap, userSnap] = await Promise.all([
       getDoc(doc(db, 'users', userId, 'profile', 'data')).catch(() => null),
       getDoc(doc(db, 'users', userId)).catch(() => null),
@@ -1721,7 +1682,6 @@ window.openUserProfileModal = async (userId) => {
     const profile = profileSnap?.exists() ? profileSnap.data() : {};
     const userDoc = userSnap?.exists() ? userSnap.data() : {};
 
-    // privacy gate
     if (userDoc.isPublic === false) {
       set('upm-name', userDoc.displayName || 'Private User');
       set('upm-bio', 'This profile is private.');
@@ -1751,7 +1711,6 @@ window.openUserProfileModal = async (userId) => {
       set('upm-joined', d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
     }
 
-    // info row (location / website)
     if (infoEl) {
       const parts = [];
       if (location) parts.push(`📍 ${esc(location)}`);
@@ -1759,7 +1718,6 @@ window.openUserProfileModal = async (userId) => {
       infoEl.innerHTML = parts.join('<span style="margin:0 8px;opacity:.3">·</span>');
     }
 
-    // posts
     const postsSnap = await getDocs(
       query(collection(db, 'community_posts'),
         where('authorId', '==', userId),
@@ -1798,7 +1756,6 @@ window.closeUserProfileModal = () => {
   document.body.style.overflow = '';
 };
 
-// close on backdrop click
 document.addEventListener('click', e => {
   const backdrop = document.getElementById('user-profile-modal');
   if (backdrop?.classList.contains('open') && e.target === backdrop) {
@@ -2072,12 +2029,12 @@ window.openExpandedPost = function (postId) {
   if (!p) return;
   window._expandedPostId = postId;
 
-  const cu = window.currentUser;
-  const isOwn = p.authorId === cu?.uid;
-  const liked = (p.likes || []).includes(cu?.uid);
+  // ── FIX: renamed inner `cu` → `_cu` ──
+  const _cu = window.currentUser;
+  const isOwn = p.authorId === _cu?.uid;
+  const liked = (p.likes || []).includes(_cu?.uid);
   const badgeClass = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
 
-  // ── choose overlay by active page ────────────────────────
   const activePage = document.querySelector('.page.active')?.id;
   const useProfile = activePage === 'page-profile';
   const overlayId = useProfile ? 'post-expand-overlay' : 'post-expand-overlay-comm';
@@ -2085,7 +2042,6 @@ window.openExpandedPost = function (postId) {
   const overlay = document.getElementById(overlayId);
   if (!overlay) return;
 
-  // ── header ────────────────────────────────────────────────
   const avatarEl = document.getElementById(prefix + '-avatar');
   const timeEl = document.getElementById(prefix + '-time');
   const authorEl = document.getElementById(prefix + '-author-row');
@@ -2108,7 +2064,6 @@ window.openExpandedPost = function (postId) {
                                padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04)">you</span>` : ''}`;
   }
 
-  // ── body ──────────────────────────────────────────────────
   let bodyHtml = '';
 
   if (p.title) {
@@ -2173,8 +2128,7 @@ window.openExpandedPost = function (postId) {
     }
   }
 
-  // ── comments section ──────────────────────────────────────
-  const myAvatar = cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
+  const myAvatar = _cu?.photoURL || `https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff`;
   bodyHtml += `
     <div style="margin-top:22px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)">
       <div id="${prefix}-comments-list" style="margin-bottom:14px">
@@ -2199,7 +2153,6 @@ window.openExpandedPost = function (postId) {
     bodyEl.scrollTop = 0;
   }
 
-  // ── footer actions ────────────────────────────────────────
   const footerEl = document.getElementById(prefix + '-footer');
   if (footerEl) {
     footerEl.innerHTML = `
@@ -2219,7 +2172,6 @@ window.openExpandedPost = function (postId) {
         </button>` : ''}`;
   }
 
-  // ── open ──────────────────────────────────────────────────
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   window._loadCommentsGlobal(postId);

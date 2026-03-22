@@ -296,12 +296,9 @@
       await _setUserProfile(profileData);
       window.userProfile = { ...window.userProfile, ...profileData };
       
-      // FIXED: Refresh global app.js state + trigger re-renders to prevent stale snapshots in new posts
+      // Update global currentUser state
       if (window.currentUser) {
         window.currentUser.displayName = newName;
-        if (typeof window.applyProfileToUI === 'function') window.applyProfileToUI();
-        // Trigger auth listener refresh for persistence
-        window.auth?.currentUser?.reload();
       }
       
       applyProfileToUI();
@@ -309,12 +306,10 @@
       closeModal('edit-profile-modal');
       _syncProfileUpdateToPosts(newName, _currentAvatarUrl());
 
-      // Also update the Firebase Auth profile
-      const { updateProfile } = window._fbAU;
-      const cu = getCurrentUser();
-      if (cu) {
+      // Update Firebase Auth profile
+      if (window._fbAU && window._fbAU.updateProfile) {
         try {
-          await updateProfile(cu, { displayName: newName });
+          await window._fbAU.updateProfile(cu, { displayName: newName });
         } catch (e) {
           console.warn('Failed to update auth profile displayName', e.message);
         }
@@ -369,19 +364,33 @@
     window.saveAvatar = async function() {
       if (!selectedAvatar) return;
       await _setUserProfile({ avatarUrl: selectedAvatar });
+      
+      // Ensure window.userProfile exists
+      window.userProfile = window.userProfile || {};
       window.userProfile.avatarUrl = selectedAvatar;
       
-      // FIXED: Refresh global state
-      if (window.currentUser && window.auth?.currentUser) {
+      // Update global currentUser
+      if (window.currentUser) {
         window.currentUser.photoURL = selectedAvatar;
-        if (typeof window.applyProfileToUI === 'function') window.applyProfileToUI();
-        window.auth.currentUser.reload();
+      }
+
+      // Update Firebase Auth profile
+      const cu = getCurrentUser();
+      if (cu) {
+        if (window._fbAU && window._fbAU.updateProfile) {
+           try { await window._fbAU.updateProfile(cu, { photoURL: selectedAvatar }); } catch(e) {}
+        } else {
+           // Fallback
+           updateAuthPhotoURL(selectedAvatar).catch(() => {});
+        }
       }
       
       applyProfileToUI();
       showToast('Avatar updated!');
       closeModal('avatar-modal');
-      _syncProfileUpdateToPosts(window.userProfile.displayName, selectedAvatar);
+      
+      const dName = window.userProfile.displayName || (cu && cu.displayName) || 'Anonymous';
+      _syncProfileUpdateToPosts(dName, selectedAvatar);
     };
 
     /* ── Cover ── */

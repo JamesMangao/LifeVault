@@ -93,7 +93,6 @@
               transform:scale(.94) translateY(18px);opacity:0;
               transition:transform .3s cubic-bezier(.34,1.2,.64,1),opacity .22s ease;">
 
-    {{-- Header --}}
     <div id="saved-modal-header"
          style="display:flex;align-items:flex-start;gap:14px;
                 padding:20px 22px 16px;
@@ -119,18 +118,15 @@
       </div>
     </div>
 
-    {{-- Summary bar --}}
     <div id="saved-modal-summary"
          style="padding:13px 22px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));flex-shrink:0"></div>
 
-    {{-- Scrollable body --}}
     <div id="saved-modal-body"
          style="flex:1;overflow-y:auto;padding:22px;
                 font-family:'Newsreader',serif;font-size:.88rem;line-height:1.87;
                 color:rgba(232,234,240,.82);font-weight:300;
                 scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent"></div>
 
-    {{-- Footer --}}
     <div id="saved-modal-footer"
          style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;
                 padding:13px 22px;
@@ -165,12 +161,10 @@
 .saved-view-btn { background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:8px;font-size:.7rem;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px; }
 .saved-view-btn:hover { border-color:var(--accent);color:var(--accent);background:rgba(79,142,247,.08); }
 
-/* Modal scrollbar */
 #saved-modal-body::-webkit-scrollbar { width:4px; }
 #saved-modal-body::-webkit-scrollbar-track { background:transparent; }
 #saved-modal-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.13);border-radius:99px; }
 
-/* Modal inner cards */
 .sm-pattern { background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:10px; }
 .sm-reframe  { background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:10px;padding:11px 15px;margin-bottom:8px; }
 .sm-label    { font-family:'JetBrains Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;margin-top:20px; }
@@ -179,7 +173,6 @@
 @media(min-width:900px)  { .saved-masonry { columns:2!important; } }
 @media(min-width:1300px) { .saved-masonry { columns:3!important; } }
 
-/* Mobile: sheet-style modal slides up from bottom */
 @media(max-width:600px) {
   #saved-modal-overlay { align-items:flex-end; padding:0; }
   #saved-modal-box     { max-width:100%;max-height:92vh;border-radius:20px 20px 0 0; }
@@ -191,244 +184,348 @@
 (function(){
 'use strict';
 
-var loadItems    = window.savedGetItems || function(){ try{ return JSON.parse(localStorage.getItem('lifevault_saved_items'))||[]; }catch(e){ return []; } };
-var persistItems = window.savedPersist  || function(items){ try{ localStorage.setItem('lifevault_saved_items', JSON.stringify(items)); }catch(e){} };
+/* ════════════════════════════════════════════════════════════
+   FIRESTORE INTEGRATION
+════════════════════════════════════════════════════════════ */
 
-/* ── State ───────────────────────────────────────────────── */
-var activeTab   = 'all';
+var currentUser = null;
+var savedItemsCache = [];
+var activeTab = 'all';
 var searchQuery = '';
+var isLoading = false;
 
-window._savedRender = renderSaved;
+// Initialize auth listener
+if (typeof window.onAuthStateChanged !== 'undefined' && window.db) {
+  window.onAuthStateChanged(window.auth, function(user) {
+    currentUser = user;
+    if (user) {
+      loadSavedItems();
+    } else {
+      savedItemsCache = [];
+      renderSaved();
+    }
+  });
+}
 
-/* ── Add ─────────────────────────────────────────────────── */
-window.savedAddItem = function(item){
-  var items = loadItems();
-  items.unshift(Object.assign({}, item, {
-    id: Date.now() + Math.random().toString(36).slice(2),
-    savedAt: new Date().toISOString()
-  }));
-  persistItems(items);
-  renderSaved();
-  if(typeof window.toast === 'function') window.toast('Saved to 🔖 Saved Items! ✨');
+/* ── Firestore Load ─────────────────────────────────────── */
+function loadSavedItems() {
+  if (!currentUser || !window.db) return;
+  
+  isLoading = true;
+  
+  try {
+    var ref = window.firebase.collection(window.db, 'users', currentUser.uid, 'saved_items');
+    window.firebase.onSnapshot(ref, 
+      function(snapshot) {
+        savedItemsCache = [];
+        snapshot.forEach(function(doc) {
+          var item = Object.assign({}, doc.data());
+          item.id = doc.id;
+          if (!item.savedAt) item.savedAt = new Date().toISOString();
+          savedItemsCache.push(item);
+        });
+        isLoading = false;
+        renderSaved();
+      },
+      function(err) {
+        console.error('[saved] Firestore load error:', err);
+        isLoading = false;
+        renderSaved();
+      }
+    );
+  } catch(e) {
+    console.warn('[saved] Firebase not fully initialized:', e.message);
+    isLoading = false;
+  }
+}
+
+/* ── Add Item (Firestore) ────────────────────────────────── */
+window.savedAddItem = function(item) {
+  if (!currentUser || !window.db) {
+    console.warn('[saved] User not authenticated or Firebase not ready');
+    return;
+  }
+
+  var now = new Date().toISOString();
+  var docData = Object.assign({}, item, {
+    savedAt: now,
+    updatedAt: now,
+    uid: currentUser.uid
+  });
+
+  try {
+    var ref = window.firebase.collection(window.db, 'users', currentUser.uid, 'saved_items');
+    window.firebase.addDoc(ref, docData).then(function(docRef) {
+      if (typeof window.toast === 'function') {
+        window.toast('Saved to 🔖 Saved Items! ✨');
+      }
+    }).catch(function(err) {
+      console.error('[saved] Add error:', err);
+      if (typeof window.toast === 'function') {
+        window.toast('Failed to save item', 'error');
+      }
+    });
+  } catch(e) {
+    console.error('[saved] Add error:', e);
+  }
 };
 
-/* ── Filter / Search ─────────────────────────────────────── */
-window.savedFilter = function(tab){
+/* ── Delete Item ────────────────────────────────────────── */
+window.savedDeleteItem = function(id) {
+  if (!currentUser || !window.db) return;
+
+  if (!confirm('Delete this saved item?')) return;
+
+  try {
+    var ref = window.firebase.doc(window.db, 'users', currentUser.uid, 'saved_items', id);
+    window.firebase.deleteDoc(ref).then(function() {
+      var el = document.getElementById('saved-' + id);
+      if (el) {
+        el.style.transition = 'opacity .2s,transform .2s';
+        el.style.opacity = '0';
+        el.style.transform = 'scale(.95)';
+        setTimeout(function() { 
+          el.remove(); 
+          recheckEmpty();
+        }, 220);
+      }
+      savedModalClose();
+    }).catch(function(err) {
+      console.error('[saved] Delete error:', err);
+    });
+  } catch(e) {
+    console.error('[saved] Delete error:', e);
+  }
+};
+
+/* ── Clear All ──────────────────────────────────────────── */
+window.savedClearAll = function() {
+  if (!confirm('Delete all saved items? This cannot be undone.')) return;
+
+  if (!currentUser || !window.db) return;
+
+  try {
+    var ref = window.firebase.collection(window.db, 'users', currentUser.uid, 'saved_items');
+    window.firebase.getDocs(ref).then(function(snapshot) {
+      var batch = window.firebase.writeBatch(window.db);
+      snapshot.forEach(function(doc) {
+        batch.delete(doc.ref);
+      });
+      return batch.commit();
+    }).then(function() {
+      savedItemsCache = [];
+      renderSaved();
+    }).catch(function(err) {
+      console.error('[saved] Clear all error:', err);
+    });
+  } catch(e) {
+    console.error('[saved] Clear all error:', e);
+  }
+};
+
+/* ── Copy Story ────────────────────────────────────────── */
+window.savedCopyStory = function(id) {
+  var item = savedItemsCache.find(function(i) { return i.id === id; });
+  if (!item) return;
+  
+  var text = '"' + item.title + '"\n\n' + item.body;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      if (typeof window.toast === 'function') window.toast('Copied! 📋');
+    });
+  } else {
+    var ta = Object.assign(document.createElement('textarea'), {value: text});
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    if (typeof window.toast === 'function') window.toast('Copied! 📋');
+  }
+};
+
+/* ── Filter / Search ────────────────────────────────────── */
+window.savedFilter = function(tab) {
   activeTab = tab;
-  document.querySelectorAll('.saved-tab').forEach(function(t){
+  document.querySelectorAll('.saved-tab').forEach(function(t) {
     var on = t.dataset.tab === tab;
     t.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
-    t.style.background  = on ? 'rgba(79,142,247,.12)' : 'var(--surface)';
-    t.style.color       = on ? 'var(--accent)' : 'var(--muted)';
+    t.style.background = on ? 'rgba(79,142,247,.12)' : 'var(--surface)';
+    t.style.color = on ? 'var(--accent)' : 'var(--muted)';
   });
   renderSaved();
 };
-window.savedSearchItems = function(q){ searchQuery = q.toLowerCase(); renderSaved(); };
 
-/* ── Clear / Delete ──────────────────────────────────────── */
-window.savedClearAll = function(){
-  if(!confirm('Delete all saved items? This cannot be undone.')) return;
-  persistItems([]); renderSaved();
-};
-window.savedDeleteItem = function(id){
-  persistItems(loadItems().filter(function(i){ return i.id !== id; }));
-  var el = document.getElementById('saved-' + id);
-  if(el){
-    el.style.transition = 'opacity .2s,transform .2s';
-    el.style.opacity    = '0';
-    el.style.transform  = 'scale(.95)';
-    setTimeout(function(){ el.remove(); recheckEmpty(); }, 220);
-  }
-  savedModalClose();
-};
-
-/* ── Copy story ──────────────────────────────────────────── */
-window.savedCopyStory = function(id){
-  var item = loadItems().find(function(i){ return i.id === id; });
-  if(!item) return;
-  var text = '"' + item.title + '"\n\n' + item.body;
-  if(navigator.clipboard){ navigator.clipboard.writeText(text).then(function(){ window.toast && window.toast('Copied! 📋'); }); }
-  else { var ta = Object.assign(document.createElement('textarea'),{value:text}); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); window.toast && window.toast('Copied! 📋'); }
+window.savedSearchItems = function(q) {
+  searchQuery = q.toLowerCase();
+  renderSaved();
 };
 
 /* ════════════════════════════════════════════════════════════
    MODAL
 ════════════════════════════════════════════════════════════ */
-window.savedModalOpen = function(id){
-  var item = loadItems().find(function(i){ return i.id === id; });
-  if(!item) return;
+
+window.savedModalOpen = function(id) {
+  var item = savedItemsCache.find(function(i) { return i.id === id; });
+  if (!item) return;
 
   var overlay = document.getElementById('saved-modal-overlay');
-  var box     = document.getElementById('saved-modal-box');
+  var box = document.getElementById('saved-modal-box');
+  if (!overlay || !box) return;
 
-  /* type config */
   var TC = {
-    'resume':           { icon:'📄', ib:'rgba(79,142,247,.14)',  ibr:'rgba(79,142,247,.22)',  badge:'Resume',  bc:'var(--accent)',  bb:'rgba(79,142,247,.1)',  bbr:'rgba(79,142,247,.22)'  },
-    'story':            { icon:'📖', ib:'rgba(167,139,250,.14)', ibr:'rgba(167,139,250,.22)', badge:'Story',   bc:'var(--lavender)',bb:'rgba(167,139,250,.1)', bbr:'rgba(167,139,250,.22)' },
-    'shadow':           { icon:'🪞', ib:'rgba(248,113,113,.14)', ibr:'rgba(248,113,113,.22)', badge:'Shadow',  bc:'var(--rose)',    bb:'rgba(248,113,113,.1)', bbr:'rgba(248,113,113,.22)' },
-    'holistic-career':  { icon:'🔮', ib:'rgba(167,139,250,.14)', ibr:'rgba(167,139,250,.22)', badge:'Career',  bc:'var(--accent)',  bb:'rgba(167,139,250,.1)', bbr:'rgba(167,139,250,.22)' }
+    'resume': { icon: '📄', ib: 'rgba(79,142,247,.14)', ibr: 'rgba(79,142,247,.22)', badge: 'Resume', bc: 'var(--accent)', bb: 'rgba(79,142,247,.1)', bbr: 'rgba(79,142,247,.22)' },
+    'story': { icon: '📖', ib: 'rgba(167,139,250,.14)', ibr: 'rgba(167,139,250,.22)', badge: 'Story', bc: 'var(--lavender)', bb: 'rgba(167,139,250,.1)', bbr: 'rgba(167,139,250,.22)' },
+    'shadow': { icon: '🪞', ib: 'rgba(248,113,113,.14)', ibr: 'rgba(248,113,113,.22)', badge: 'Shadow', bc: 'var(--rose)', bb: 'rgba(248,113,113,.1)', bbr: 'rgba(248,113,113,.22)' },
+    'holistic-career': { icon: '🔮', ib: 'rgba(167,139,250,.14)', ibr: 'rgba(167,139,250,.22)', badge: 'Career', bc: 'var(--accent)', bb: 'rgba(167,139,250,.1)', bbr: 'rgba(167,139,250,.22)' }
   };
   var tc = TC[item.type] || TC['resume'];
 
-  /* header */
   var iconEl = document.getElementById('saved-modal-icon');
   iconEl.textContent = tc.icon;
   iconEl.style.background = tc.ib;
-  iconEl.style.border     = '1px solid ' + tc.ibr;
+  iconEl.style.border = '1px solid ' + tc.ibr;
 
   document.getElementById('saved-modal-title').textContent =
     item.type === 'story' ? '"' + (item.title || 'My Life Story') + '"' :
     (item.title || item.summaryTitle || 'Saved Item');
 
   document.getElementById('saved-modal-meta').textContent =
-    relTime(item.savedAt) + (item.subtitle ? ' · ' + item.subtitle : (item.type === 'shadow' ? ' · ' + (item.patterns||[]).length + ' patterns' : ''));
+    relTime(item.savedAt) + (item.subtitle ? ' · ' + item.subtitle : (item.type === 'shadow' ? ' · ' + (item.patterns || []).length + ' patterns' : ''));
 
   document.getElementById('saved-modal-badge').innerHTML =
-    '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.54rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:3px 9px;border-radius:99px;background:'+tc.bb+';border:1px solid '+tc.bbr+';color:'+tc.bc+'">'+tc.badge+'</span>';
+    '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.54rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:3px 9px;border-radius:99px;background:' + tc.bb + ';border:1px solid ' + tc.bbr + ';color:' + tc.bc + '">' + tc.badge + '</span>';
 
-  /* summary */
   document.getElementById('saved-modal-summary').innerHTML = buildModalSummary(item);
-
-  /* body */
   document.getElementById('saved-modal-body').innerHTML = buildModalBody(item);
   document.getElementById('saved-modal-body').scrollTop = 0;
 
-  /* footer */
   var fh = '';
-  if(item.type === 'story'){
-    fh += '<button onclick="savedCopyStory(\''+id+'\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.28);color:var(--lavender)">📋 Copy Story</button>';
+  if (item.type === 'story') {
+    fh += '<button onclick="savedCopyStory(\'' + id + '\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.28);color:var(--lavender)">📋 Copy Story</button>';
   }
-  fh += '<button class="saved-delete-btn" onclick="savedDeleteItem(\''+id+'\')">'
+  fh += '<button class="saved-delete-btn" onclick="savedDeleteItem(\'' + id + '\')">'
     + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>';
   fh += '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'
-    + new Date(item.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>';
+    + new Date(item.savedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) + '</span>';
   document.getElementById('saved-modal-footer').innerHTML = fh;
 
-  /* animate in */
   overlay.style.display = 'flex';
   document.body.style.overflow = 'hidden';
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
       box.style.transform = 'scale(1) translateY(0)';
-      box.style.opacity   = '1';
+      box.style.opacity = '1';
     });
   });
 
-  /* esc to close */
-  document._savedEsc = function(e){ if(e.key === 'Escape') savedModalClose(); };
+  document._savedEsc = function(e) { if (e.key === 'Escape') savedModalClose(); };
   document.addEventListener('keydown', document._savedEsc);
 };
 
-window.savedModalClose = function(e){
-  /* if called from overlay click, only close when clicking the backdrop itself */
-  if(e && e.target && e.target.id !== 'saved-modal-overlay') return;
+window.savedModalClose = function(e) {
+  if (e && e.target && e.target.id !== 'saved-modal-overlay') return;
   var overlay = document.getElementById('saved-modal-overlay');
-  var box     = document.getElementById('saved-modal-box');
+  var box = document.getElementById('saved-modal-box');
+  if (!overlay || !box) return;
   box.style.transform = 'scale(.94) translateY(18px)';
-  box.style.opacity   = '0';
-  setTimeout(function(){
-    overlay.style.display    = 'none';
+  box.style.opacity = '0';
+  setTimeout(function() {
+    overlay.style.display = 'none';
     document.body.style.overflow = '';
   }, 240);
-  if(document._savedEsc){ document.removeEventListener('keydown', document._savedEsc); }
+  if (document._savedEsc) { document.removeEventListener('keydown', document._savedEsc); }
 };
 
-/* ── Modal: summary bar ──────────────────────────────────── */
-function buildModalSummary(item){
-  if(item.type === 'resume' || item.type === 'holistic-career'){
-    var s = item.score || 0, ok = s>=75, mid = s>=50;
-    var sc = ok?'var(--green)':mid?'var(--amber)':'var(--rose)';
-    var sb = ok?'rgba(52,211,153,.1)':mid?'rgba(251,191,36,.1)':'rgba(248,113,113,.1)';
-    var sr = ok?'rgba(52,211,153,.3)':mid?'rgba(251,191,36,.3)':'rgba(248,113,113,.3)';
+/* ── Modal content builders ──────────────────────────────– */
+function buildModalSummary(item) {
+  if (item.type === 'resume' || item.type === 'holistic-career') {
+    var s = item.score || 0, ok = s >= 75, mid = s >= 50;
+    var sc = ok ? 'var(--green)' : mid ? 'var(--amber)' : 'var(--rose)';
+    var sb = ok ? 'rgba(52,211,153,.1)' : mid ? 'rgba(251,191,36,.1)' : 'rgba(248,113,113,.1)';
+    var sr = ok ? 'rgba(52,211,153,.3)' : mid ? 'rgba(251,191,36,.3)' : 'rgba(248,113,113,.3)';
     var lbl = item.type === 'holistic-career'
-      ? (s>=80?'Highly Aligned':s>=60?'Moderately Aligned':s>=40?'Partially Aligned':'Misaligned')
-      : (ok?'Strong Match':mid?'Moderate Match':'Needs Work');
+      ? (s >= 80 ? 'Highly Aligned' : s >= 60 ? 'Moderately Aligned' : s >= 40 ? 'Partially Aligned' : 'Misaligned')
+      : (ok ? 'Strong Match' : mid ? 'Moderate Match' : 'Needs Work');
     return '<div style="display:flex;align-items:center;gap:14px">'
-      +'<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 16px;border-radius:99px;font-family:\'JetBrains Mono\',monospace;font-size:.7rem;font-weight:700;background:'+sb+';border:1px solid '+sr+';color:'+sc+'">'
-      +'<span style="font-size:.9rem;font-weight:900">'+s+'</span><span style="opacity:.6">/100</span></span>'
-      +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.62rem;color:'+sc+';text-transform:uppercase;letter-spacing:.08em">'+lbl+'</span>'
-      +'</div>';
+      + '<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 16px;border-radius:99px;font-family:\'JetBrains Mono\',monospace;font-size:.7rem;font-weight:700;background:' + sb + ';border:1px solid ' + sr + ';color:' + sc + '">'
+      + '<span style="font-size:.9rem;font-weight:900">' + s + '</span><span style="opacity:.6">/100</span></span>'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.62rem;color:' + sc + ';text-transform:uppercase;letter-spacing:.08em">' + lbl + '</span>'
+      + '</div>';
   }
-  if(item.type === 'shadow'){
+  if (item.type === 'shadow') {
     var score = item.awarenessScore != null ? item.awarenessScore : '—';
-    var CM = {rose:'var(--rose)',amber:'var(--amber)',lavender:'var(--lavender)',teal:'var(--teal)',accent:'var(--accent)'};
-    var BM = {rose:'rgba(248,113,113,.1)',amber:'rgba(251,191,36,.1)',lavender:'rgba(167,139,250,.12)',teal:'rgba(45,212,191,.1)',accent:'rgba(79,142,247,.1)'};
-    var RM = {rose:'rgba(248,113,113,.25)',amber:'rgba(251,191,36,.25)',lavender:'rgba(167,139,250,.28)',teal:'rgba(45,212,191,.25)',accent:'rgba(79,142,247,.25)'};
-    var badges = (item.patterns||[]).slice(0,5).map(function(p){
-      var c=CM[p.color]||'var(--rose)',b=BM[p.color]||'rgba(248,113,113,.1)',r=RM[p.color]||'rgba(248,113,113,.25)';
-      return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:3px 9px;border-radius:99px;background:'+b+';color:'+c+';border:1px solid '+r+';text-transform:uppercase;letter-spacing:.05em">'+esc(p.emoji||'')+' '+esc(p.name||'')+'</span>';
+    var CM = {rose: 'var(--rose)', amber: 'var(--amber)', lavender: 'var(--lavender)', teal: 'var(--teal)', accent: 'var(--accent)'};
+    var BM = {rose: 'rgba(248,113,113,.1)', amber: 'rgba(251,191,36,.1)', lavender: 'rgba(167,139,250,.12)', teal: 'rgba(45,212,191,.1)', accent: 'rgba(79,142,247,.1)'};
+    var RM = {rose: 'rgba(248,113,113,.25)', amber: 'rgba(251,191,36,.25)', lavender: 'rgba(167,139,250,.28)', teal: 'rgba(45,212,191,.25)', accent: 'rgba(79,142,247,.25)'};
+    var badges = (item.patterns || []).slice(0, 5).map(function(p) {
+      var c = CM[p.color] || 'var(--rose)', b = BM[p.color] || 'rgba(248,113,113,.1)', r = RM[p.color] || 'rgba(248,113,113,.25)';
+      return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:3px 9px;border-radius:99px;background:' + b + ';color:' + c + ';border:1px solid ' + r + ';text-transform:uppercase;letter-spacing:.05em">' + esc(p.emoji || '') + ' ' + esc(p.name || '') + '</span>';
     }).join('');
     return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
-      +'<div style="text-align:center;flex-shrink:0">'
-      +'<div style="font-size:1.7rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">'+score+'%</div>'
-      +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Awareness</div></div>'
-      +(item.summaryText ? '<div style="flex:1;min-width:160px;font-family:\'Newsreader\',serif;font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.55;font-weight:300">'+esc(item.summaryText)+'</div>' : '')
-      +'</div>'
-      +(badges ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px">'+badges+'</div>' : '');
+      + '<div style="text-align:center;flex-shrink:0">'
+      + '<div style="font-size:1.7rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">' + score + '%</div>'
+      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Awareness</div></div>'
+      + (item.summaryText ? '<div style="flex:1;min-width:160px;font-family:\'Newsreader\',serif;font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.55;font-weight:300">' + esc(item.summaryText) + '</div>' : '')
+      + '</div>'
+      + (badges ? '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px">' + badges + '</div>' : '');
   }
-  if(item.type === 'story'){
-    var wc = (item.body||'').split(/\s+/).filter(Boolean).length;
-    var SM = {memoir:'📝 Memoir',literary:'📚 Literary',poetic:'🌸 Poetic',cinematic:'🎬 Cinematic',epistolary:'✉️ Epistolary',stream:'🌊 Stream',mythic:'⚔️ Mythic',detective:'🔍 Self-Discovery'};
-    var RL = {last7:'Last 7 Days',last30:'Last 30 Days',last90:'Last 3 Months',all:'All Time'};
-    var themes = (item.themes||[]).slice(0,5).map(function(t){
-      return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:2px 8px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender);text-transform:uppercase;letter-spacing:.06em">'+esc(t)+'</span>';
+  if (item.type === 'story') {
+    var wc = (item.body || '').split(/\s+/).filter(Boolean).length;
+    var SM = {memoir: '📝 Memoir', literary: '📚 Literary', poetic: '🌸 Poetic', cinematic: '🎬 Cinematic', epistolary: '✉️ Epistolary', stream: '🌊 Stream', mythic: '⚔️ Mythic', detective: '🔍 Self-Discovery'};
+    var RL = {last7: 'Last 7 Days', last30: 'Last 30 Days', last90: 'Last 3 Months', all: 'All Time'};
+    var themes = (item.themes || []).slice(0, 5).map(function(t) {
+      return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:2px 8px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender);text-transform:uppercase;letter-spacing:.06em">' + esc(t) + '</span>';
     }).join('');
     return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
-      +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">'+wc+' words</span>'
-      +(SM[item.style]?'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">'+esc(SM[item.style])+'</span>':'')
-      +(RL[item.range]?'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">'+esc(RL[item.range])+'</span>':'')
-      +themes+'</div>';
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">' + wc + ' words</span>'
+      + (SM[item.style] ? '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">' + esc(SM[item.style]) + '</span>' : '')
+      + (RL[item.range] ? '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">' + esc(RL[item.range]) + '</span>' : '')
+      + themes + '</div>';
   }
   return '';
 }
 
-/* ── Modal: body ─────────────────────────────────────────── */
-function buildModalBody(item){
-  if(item.type === 'resume')          return '<div style="white-space:pre-wrap">'+esc(item.markdown||'')+'</div>';
-  if(item.type === 'holistic-career') return '<div style="white-space:pre-wrap">'+esc(item.content||'')+'</div>';
-  if(item.type === 'story')           return '<div style="white-space:pre-wrap">'+esc(item.body||'')+'</div>';
-
-  if(item.type === 'shadow'){
-    var CM = {rose:'var(--rose)',amber:'var(--amber)',lavender:'var(--lavender)',teal:'var(--teal)',accent:'var(--accent)'};
-    var BM = {rose:'rgba(248,113,113,.08)',amber:'rgba(251,191,36,.08)',lavender:'rgba(167,139,250,.1)',teal:'rgba(45,212,191,.08)',accent:'rgba(79,142,247,.08)'};
-    var RM = {rose:'rgba(248,113,113,.2)',amber:'rgba(251,191,36,.2)',lavender:'rgba(167,139,250,.22)',teal:'rgba(45,212,191,.2)',accent:'rgba(79,142,247,.2)'};
-    var out = '';
-    var patterns = item.patterns || [];
-
-    if(patterns.length){
+function buildModalBody(item) {
+  if (item.type === 'resume') return '<div style="white-space:pre-wrap">' + esc(item.markdown || '') + '</div>';
+  if (item.type === 'holistic-career') return '<div style="white-space:pre-wrap">' + esc(item.content || '') + '</div>';
+  if (item.type === 'story') return '<div style="white-space:pre-wrap">' + esc(item.body || '') + '</div>';
+  if (item.type === 'shadow') {
+    var CM = {rose: 'var(--rose)', amber: 'var(--amber)', lavender: 'var(--lavender)', teal: 'var(--teal)', accent: 'var(--accent)'};
+    var BM = {rose: 'rgba(248,113,113,.08)', amber: 'rgba(251,191,36,.08)', lavender: 'rgba(167,139,250,.1)', teal: 'rgba(45,212,191,.08)', accent: 'rgba(79,142,247,.08)'};
+    var RM = {rose: 'rgba(248,113,113,.2)', amber: 'rgba(251,191,36,.2)', lavender: 'rgba(167,139,250,.22)', teal: 'rgba(45,212,191,.2)', accent: 'rgba(79,142,247,.2)'};
+    var out = '', patterns = item.patterns || [];
+    if (patterns.length) {
       out += '<div class="sm-label">Detected Patterns</div>';
-      patterns.forEach(function(p){
-        var c=CM[p.color]||'var(--rose)', b=BM[p.color]||'rgba(248,113,113,.08)', r=RM[p.color]||'rgba(248,113,113,.2)';
-        var bars = Array.from({length:5},function(_,j){
-          return '<div style="flex:1;height:5px;border-radius:99px;background:'+(j<(p.severity||1)?c:'rgba(255,255,255,.07)')+'"></div>';
+      patterns.forEach(function(p) {
+        var c = CM[p.color] || 'var(--rose)', b = BM[p.color] || 'rgba(248,113,113,.08)', r = RM[p.color] || 'rgba(248,113,113,.2)';
+        var bars = Array.from({length: 5}, function(_, j) {
+          return '<div style="flex:1;height:5px;border-radius:99px;background:' + (j < (p.severity || 1) ? c : 'rgba(255,255,255,.07)') + '"></div>';
         }).join('');
-        out += '<div class="sm-pattern" style="border-color:'+r+';background:'+b+'">'
-          +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
-          +'<span style="font-size:1.3rem">'+esc(p.emoji||'😔')+'</span>'
-          +'<div style="font-size:.82rem;font-weight:700;color:'+c+';flex:1">'+esc(p.name||'')+'</div>'
-          +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:var(--muted)">'+(p.severity||1)+'/5</div>'
-          +'</div>'
-          +'<div style="display:flex;gap:3px;margin-bottom:10px">'+bars+'</div>'
-          +'<div style="font-size:.85rem;color:rgba(232,234,240,.75);line-height:1.65">'+esc(p.description||'')+'</div>'
-          +'</div>';
+        out += '<div class="sm-pattern" style="border-color:' + r + ';background:' + b + '">'
+          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+          + '<span style="font-size:1.3rem">' + esc(p.emoji || '😔') + '</span>'
+          + '<div style="font-size:.82rem;font-weight:700;color:' + c + ';flex:1">' + esc(p.name || '') + '</div>'
+          + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:var(--muted)">' + (p.severity || 1) + '/5</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:3px;margin-bottom:10px">' + bars + '</div>'
+          + '<div style="font-size:.85rem;color:rgba(232,234,240,.75);line-height:1.65">' + esc(p.description || '') + '</div>'
+          + '</div>';
       });
     }
-
-    if((item.reframes||[]).length){
+    if ((item.reframes || []).length) {
       out += '<div class="sm-label">Compassionate Reframes</div>';
-      (item.reframes||[]).forEach(function(r){
+      (item.reframes || []).forEach(function(r) {
         out += '<div class="sm-reframe">'
-          +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.52rem;color:var(--rose);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Shadow → Truth</div>'
-          +'<div style="font-size:.82rem;color:rgba(232,234,240,.6);font-style:italic;margin-bottom:6px">"'+esc(r.shadow||'')+'"</div>'
-          +'<div style="font-size:.85rem;color:rgba(232,234,240,.88)">'+esc(r.reframe||'')+'</div>'
-          +'</div>';
+          + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.52rem;color:var(--rose);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Shadow → Truth</div>'
+          + '<div style="font-size:.82rem;color:rgba(232,234,240,.6);font-style:italic;margin-bottom:6px">"' + esc(r.shadow || '') + '"</div>'
+          + '<div style="font-size:.85rem;color:rgba(232,234,240,.88)">' + esc(r.reframe || '') + '</div>'
+          + '</div>';
       });
     }
-
-    if((item.strengths||[]).length){
+    if ((item.strengths || []).length) {
       out += '<div class="sm-label">Hidden Strengths</div><div style="display:flex;gap:7px;flex-wrap:wrap">';
-      (item.strengths||[]).forEach(function(s){
-        out += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;padding:5px 12px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender)">'+esc(s)+'</span>';
+      (item.strengths || []).forEach(function(s) {
+        out += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;padding:5px 12px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender)">' + esc(s) + '</span>';
       });
       out += '</div>';
     }
@@ -438,267 +535,235 @@ function buildModalBody(item){
 }
 
 /* ════════════════════════════════════════════════════════════
-   CARD BUILDERS  (compact previews — no inline accordion)
+   CARD BUILDERS
 ════════════════════════════════════════════════════════════ */
-function viewBtn(id, label){
-  return '<button class="saved-view-btn" onclick="event.stopPropagation();savedModalOpen(\''+id+'\')">'
-    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
-    +esc(label)+'</button>';
+
+var DEL_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>';
+var EYE_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+function viewBtn(id, label) {
+  return '<button class="saved-view-btn" onclick="event.stopPropagation();savedModalOpen(\'' + id + '\')">'
+    + EYE_SVG + esc(label) + '</button>';
 }
 
-function buildResumeCard(item){
-  var s = item.score||0, ok = s>=75, mid = s>=50;
-  var sc = ok?'var(--green)':mid?'var(--amber)':'var(--rose)';
-  var sb = ok?'rgba(52,211,153,.1)':mid?'rgba(251,191,36,.1)':'rgba(248,113,113,.1)';
-  var sr = ok?'rgba(52,211,153,.3)':mid?'rgba(251,191,36,.3)':'rgba(248,113,113,.3)';
-  var lbl = ok?'Strong Match':mid?'Moderate Match':'Needs Work';
-  var preview = (item.markdown||'').replace(/#{1,3} .+\n?/g,'').replace(/\*\*/g,'').replace(/\*/g,'').trim().slice(0,220);
-
-  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(79,142,247,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-header">'
-    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📄</div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(item.title||'Resume Analysis')+'</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+esc(item.subtitle||'')+' · '+relTime(item.savedAt)+'</div></div>'
-    +'<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">Resume</span>'
-    +'</div>'
-    +'<div class="saved-body">'
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
-    +'<span class="saved-score-pill" style="background:'+sb+';border:1px solid '+sr+';color:'+sc+'"><span style="font-size:.8rem;font-weight:900">'+s+'</span><span style="opacity:.6">/100</span></span>'
-    +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:'+sc+';text-transform:uppercase;letter-spacing:.08em">'+lbl+'</span>'
-    +'</div>'
-    +(preview?'<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'…</div>':'')
-    +'</div>'
-    +'<div class="saved-footer" onclick="event.stopPropagation()">'
-    +viewBtn(item.id,'View Report')
-    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
-    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
-    +'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'+new Date(item.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'
-    +'</div></div>';
+function delBtn(id) {
+  return '<button class="saved-delete-btn" onclick="event.stopPropagation();savedDeleteItem(\'' + id + '\')">'
+    + DEL_SVG + 'Delete</button>';
 }
 
-function buildStoryCard(item){
-  var SM={memoir:'📝 Memoir',literary:'📚 Literary',poetic:'🌸 Poetic',cinematic:'🎬 Cinematic',epistolary:'✉️ Epistolary',stream:'🌊 Stream',mythic:'⚔️ Mythic',detective:'🔍 Self-Discovery'};
-  var RL={last7:'Last 7 Days',last30:'Last 30 Days',last90:'Last 3 Months',all:'All Time'};
-  var preview = (item.body||'').slice(0,240);
-  var wc = (item.body||'').split(/\s+/).filter(Boolean).length;
-  var themes = (item.themes||[]).slice(0,3).map(function(t){
-    return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:2px 8px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender);text-transform:uppercase;letter-spacing:.06em">'+esc(t)+'</span>';
+function dateStr(iso) {
+  return new Date(iso).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+}
+
+function buildResumeCard(item) {
+  var s = item.score || 0, ok = s >= 75, mid = s >= 50;
+  var sc = ok ? 'var(--green)' : mid ? 'var(--amber)' : 'var(--rose)';
+  var sb = ok ? 'rgba(52,211,153,.1)' : mid ? 'rgba(251,191,36,.1)' : 'rgba(248,113,113,.1)';
+  var sr = ok ? 'rgba(52,211,153,.3)' : mid ? 'rgba(251,191,36,.3)' : 'rgba(248,113,113,.3)';
+  var lbl = ok ? 'Strong Match' : mid ? 'Moderate Match' : 'Needs Work';
+  var preview = (item.markdown || '').replace(/#{1,3} .+\n?/g, '').replace(/\*\*/g, '').replace(/\*/g, '').trim().slice(0, 220);
+  return '<div class="saved" id="saved-' + item.id + '" style="border-color:rgba(79,142,247,.18)" onclick="savedModalOpen(\'' + item.id + '\')">'
+    + '<div class="saved-header">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📄</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(item.title || 'Resume Analysis') + '</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + esc(item.subtitle || '') + ' · ' + relTime(item.savedAt) + '</div></div>'
+    + '<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">Resume</span>'
+    + '</div>'
+    + '<div class="saved-body">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    + '<span class="saved-score-pill" style="background:' + sb + ';border:1px solid ' + sr + ';color:' + sc + '"><span style="font-size:.8rem;font-weight:900">' + s + '</span><span style="opacity:.6">/100</span></span>'
+    + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:' + sc + ';text-transform:uppercase;letter-spacing:.08em">' + lbl + '</span>'
+    + '</div>'
+    + (preview ? '<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
+    + '</div>'
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
+    + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
+    + '</div></div>';
+}
+
+function buildStoryCard(item) {
+  var SM = {memoir: '📝 Memoir', literary: '📚 Literary', poetic: '🌸 Poetic', cinematic: '🎬 Cinematic', epistolary: '✉️ Epistolary', stream: '🌊 Stream', mythic: '⚔️ Mythic', detective: '🔍 Self-Discovery'};
+  var RL = {last7: 'Last 7 Days', last30: 'Last 30 Days', last90: 'Last 3 Months', all: 'All Time'};
+  var preview = (item.body || '').slice(0, 240);
+  var wc = (item.body || '').split(/\s+/).filter(Boolean).length;
+  var themes = (item.themes || []).slice(0, 3).map(function(t) {
+    return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:2px 8px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender);text-transform:uppercase;letter-spacing:.06em">' + esc(t) + '</span>';
   }).join('');
-
-  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-header">'
-    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📖</div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic">"'+esc(item.title||'My Life Story')+'"</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+(SM[item.style]||item.style||'')+' · '+(RL[item.range]||'')+' · '+relTime(item.savedAt)+'</div></div>'
-    +'<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender)">Story</span>'
-    +'</div>'
-    +'<div class="saved-body">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
-    +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">'+wc+' words</span>'+themes
-    +'</div>'
-    +'<div style="font-family:\'Newsreader\',serif;font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+(preview.length>=240?'…':'')+'</div>'
-    +'</div>'
-    +'<div class="saved-footer" onclick="event.stopPropagation()">'
-    +viewBtn(item.id,'Read Full Story')
-    +'<button onclick="event.stopPropagation();savedCopyStory(\''+item.id+'\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.25);color:var(--lavender)">📋 Copy</button>'
-    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
-    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
-    +'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'+new Date(item.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'
-    +'</div></div>';
+  return '<div class="saved" id="saved-' + item.id + '" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\'' + item.id + '\')">'
+    + '<div class="saved-header">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">📖</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic">"' + esc(item.title || 'My Life Story') + '"</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + (SM[item.style] || item.style || '') + ' · ' + (RL[item.range] || '') + ' · ' + relTime(item.savedAt) + '</div></div>'
+    + '<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--lavender)">Story</span>'
+    + '</div>'
+    + '<div class="saved-body">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:3px 9px;border-radius:6px">' + wc + ' words</span>' + themes
+    + '</div>'
+    + '<div style="font-family:\'Newsreader\',serif;font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + (preview.length >= 240 ? '…' : '') + '</div>'
+    + '</div>'
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'Read Full Story')
+    + '<button onclick="event.stopPropagation();savedCopyStory(\'' + item.id + '\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.25);color:var(--lavender)">📋 Copy</button>'
+    + delBtn(item.id)
+    + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
+    + '</div></div>';
 }
 
-function buildShadowCard(item){
-  var CM={rose:'var(--rose)',amber:'var(--amber)',lavender:'var(--lavender)',teal:'var(--teal)',accent:'var(--accent)'};
-  var BM={rose:'rgba(248,113,113,.1)',amber:'rgba(251,191,36,.1)',lavender:'rgba(167,139,250,.12)',teal:'rgba(45,212,191,.1)',accent:'rgba(79,142,247,.1)'};
-  var RM={rose:'rgba(248,113,113,.25)',amber:'rgba(251,191,36,.25)',lavender:'rgba(167,139,250,.28)',teal:'rgba(45,212,191,.25)',accent:'rgba(79,142,247,.25)'};
-  var patterns = item.patterns||[];
+function buildShadowCard(item) {
+  var CM = {rose: 'var(--rose)', amber: 'var(--amber)', lavender: 'var(--lavender)', teal: 'var(--teal)', accent: 'var(--accent)'};
+  var BM = {rose: 'rgba(248,113,113,.1)', amber: 'rgba(251,191,36,.1)', lavender: 'rgba(167,139,250,.12)', teal: 'rgba(45,212,191,.1)', accent: 'rgba(79,142,247,.1)'};
+  var RM = {rose: 'rgba(248,113,113,.25)', amber: 'rgba(251,191,36,.25)', lavender: 'rgba(167,139,250,.28)', teal: 'rgba(45,212,191,.25)', accent: 'rgba(79,142,247,.25)'};
+  var patterns = item.patterns || [];
   var score = item.awarenessScore != null ? item.awarenessScore : '—';
-  var badges = patterns.slice(0,4).map(function(p){
-    var c=CM[p.color]||'var(--rose)',b=BM[p.color]||'rgba(248,113,113,.1)',r=RM[p.color]||'rgba(248,113,113,.25)';
-    return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:3px 9px;border-radius:99px;background:'+b+';color:'+c+';border:1px solid '+r+';text-transform:uppercase;letter-spacing:.05em">'+esc(p.emoji||'')+' '+esc(p.name||'')+'</span>';
+  var badges = patterns.slice(0, 4).map(function(p) {
+    var c = CM[p.color] || 'var(--rose)', b = BM[p.color] || 'rgba(248,113,113,.1)', r = RM[p.color] || 'rgba(248,113,113,.25)';
+    return '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.55rem;padding:3px 9px;border-radius:99px;background:' + b + ';color:' + c + ';border:1px solid ' + r + ';text-transform:uppercase;letter-spacing:.05em">' + esc(p.emoji || '') + ' ' + esc(p.name || '') + '</span>';
   }).join('');
-
-  return '<div class="saved"saved-'+item.id+'" style="border-color:rgba(248,113,113,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-header">'
-    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🪞</div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text)">'+esc(item.summaryTitle||'Shadow Analysis')+'</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+patterns.length+' patterns · '+relTime(item.savedAt)+'</div></div>'
-    +'<span class="saved-type-badge" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--rose)">Shadow</span>'
-    +'</div>'
-    +'<div class="saved">'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
-    +'<div style="text-align:center;flex-shrink:0">'
-    +'<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">'+score+'%</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Awareness</div></div>'
-    +'<div style="flex:1;font-family:\'Newsreader\',serif;font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.6;font-weight:300">'+esc(item.summaryText||'')+'</div>'
-    +'</div>'
-    +'<div style="display:flex;gap:5px;flex-wrap:wrap">'+badges+'</div>'
-    +'</div>'
-    +'<div class="saved-footer" onclick="event.stopPropagation()">'
-    +viewBtn(item.id,'View Analysis')
-    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
-    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
-    +'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'+new Date(item.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'
-    +'</div></div>';
+  return '<div class="saved" id="saved-' + item.id + '" style="border-color:rgba(248,113,113,.18)" onclick="savedModalOpen(\'' + item.id + '\')">'
+    + '<div class="saved-header">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🪞</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text)">' + esc(item.summaryTitle || 'Shadow Analysis') + '</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + patterns.length + ' patterns · ' + relTime(item.savedAt) + '</div></div>'
+    + '<span class="saved-type-badge" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--rose)">Shadow</span>'
+    + '</div>'
+    + '<div class="saved-body">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+    + '<div style="text-align:center;flex-shrink:0">'
+    + '<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--rose),var(--lavender));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">' + score + '%</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Awareness</div></div>'
+    + '<div style="flex:1;font-family:\'Newsreader\',serif;font-size:.8rem;color:rgba(232,234,240,.7);line-height:1.6;font-weight:300">' + esc(item.summaryText || '') + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap">' + badges + '</div>'
+    + '</div>'
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Analysis') + delBtn(item.id)
+    + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
+    + '</div></div>';
 }
 
-function buildHolisticCard(item){
-  var s = item.score||0;
-  var m = s>=80?{color:'var(--green)',bg:'rgba(52,211,153,.1)',br:'rgba(52,211,153,.3)',lbl:'Highly Aligned'}
-         :s>=60?{color:'var(--accent)',bg:'rgba(167,139,250,.1)',br:'rgba(167,139,250,.3)',lbl:'Moderately Aligned'}
-         :s>=40?{color:'var(--amber)',bg:'rgba(251,191,36,.1)',br:'rgba(251,191,36,.3)',lbl:'Partially Aligned'}
-               :{color:'var(--rose)',bg:'rgba(248,113,113,.1)',br:'rgba(248,113,113,.3)',lbl:'Misaligned'};
-  var preview = (item.content||'').replace(/#{1,3} .+\n?/g,'').replace(/\*\*/g,'').replace(/\*/g,'').trim().slice(0,240);
-
-  return '<div class="saved" id="saved-'+item.id+'" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-header">'
-    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔮</div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(item.title||'Holistic Career Report')+'</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+relTime(item.savedAt)+'</div></div>'
-    +'<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--accent)">Career</span>'
-    +'</div>'
-    +'<div class="saved-body">'
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
-    +'<span class="saved-score-pill" style="background:'+m.bg+';border:1px solid '+m.br+';color:'+m.color+'"><span style="font-size:.8rem;font-weight:900">'+s+'</span><span style="opacity:.6">/100</span></span>'
-    +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:'+m.color+';text-transform:uppercase;letter-spacing:.08em">'+m.lbl+'</span>'
-    +'</div>'
-    +(preview?'<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'…</div>':'')
-    +'</div>'
-    +'<div class="saved-footer" onclick="event.stopPropagation()">'
-    +viewBtn(item.id,'View Report')
-    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
-    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
-    +'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'+new Date(item.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'
-    +'</div></div>';
+function buildHolisticCard(item) {
+  var s = item.score || 0;
+  var m = s >= 80 ? {color: 'var(--green)', bg: 'rgba(52,211,153,.1)', br: 'rgba(52,211,153,.3)', lbl: 'Highly Aligned'}
+    : s >= 60 ? {color: 'var(--accent)', bg: 'rgba(167,139,250,.1)', br: 'rgba(167,139,250,.3)', lbl: 'Moderately Aligned'}
+    : s >= 40 ? {color: 'var(--amber)', bg: 'rgba(251,191,36,.1)', br: 'rgba(251,191,36,.3)', lbl: 'Partially Aligned'}
+    : {color: 'var(--rose)', bg: 'rgba(248,113,113,.1)', br: 'rgba(248,113,113,.3)', lbl: 'Misaligned'};
+  var preview = (item.content || '').replace(/#{1,3} .+\n?/g, '').replace(/\*\*/g, '').replace(/\*/g, '').trim().slice(0, 240);
+  return '<div class="saved" id="saved-' + item.id + '" style="border-color:rgba(167,139,250,.18)" onclick="savedModalOpen(\'' + item.id + '\')">'
+    + '<div class="saved-header">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔮</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(item.title || 'Holistic Career Report') + '</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + relTime(item.savedAt) + '</div></div>'
+    + '<span class="saved-type-badge" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--accent)">Career</span>'
+    + '</div>'
+    + '<div class="saved-body">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    + '<span class="saved-score-pill" style="background:' + m.bg + ';border:1px solid ' + m.br + ';color:' + m.color + '"><span style="font-size:.8rem;font-weight:900">' + s + '</span><span style="opacity:.6">/100</span></span>'
+    + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:' + m.color + ';text-transform:uppercase;letter-spacing:.08em">' + m.lbl + '</span>'
+    + '</div>'
+    + (preview ? '<div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
+    + '</div>'
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
+    + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
+    + '</div></div>';
 }
 
-/* ── Helpers ─────────────────────────────────────────────── */
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function relTime(iso){
+function buildGenericCard(item) {
+  var preview = (item.body || item.markdown || item.content || item.summaryText || '').slice(0, 200);
+  return '<div class="saved" id="saved-' + item.id + '" onclick="savedModalOpen(\'' + item.id + '\')">'
+    + '<div class="saved-header">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔖</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;color:var(--text)">' + esc(item.title || item.summaryTitle || 'Saved Item') + '</div>'
+    + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">' + esc(item.type || 'unknown') + ' · ' + relTime(item.savedAt) + '</div></div>'
+    + '<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">' + esc(item.type || 'item') + '</span>'
+    + '</div>'
+    + (preview ? '<div class="saved-body"><div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '</div></div>' : '')
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + delBtn(item.id) + '</div></div>';
+}
+
+/* ── Helpers ─────────────────────────────────────────── */
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function relTime(iso) {
   var d = Date.now() - new Date(iso).getTime();
-  if(d<60000)    return 'just now';
-  if(d<3600000)  return Math.floor(d/60000)+'m ago';
-  if(d<86400000) return Math.floor(d/3600000)+'h ago';
-  return Math.floor(d/86400000)+'d ago';
+  if (d < 60000) return 'just now';
+  if (d < 3600000) return Math.floor(d / 60000) + 'm ago';
+  if (d < 86400000) return Math.floor(d / 3600000) + 'h ago';
+  return Math.floor(d / 86400000) + 'd ago';
 }
 
-/* ── Tab counts ──────────────────────────────────────────── */
-function updateCounts(items){
-  var c={all:items.length,resume:0,story:0,shadow:0,'holistic-career':0};
-  items.forEach(function(i){ if(c[i.type]!=null) c[i.type]++; });
-  document.querySelectorAll('.saved-tab-count').forEach(function(el){
-    el.textContent = c[el.dataset.tab]!=null ? c[el.dataset.tab] : 0;
+function updateCounts(items) {
+  var c = {all: items.length, resume: 0, story: 0, shadow: 0, 'holistic-career': 0};
+  items.forEach(function(i) { if (c[i.type] != null) c[i.type]++; });
+  document.querySelectorAll('.saved-tab-count').forEach(function(el) {
+    el.textContent = c[el.dataset.tab] != null ? c[el.dataset.tab] : 0;
   });
 }
 
-/* ── Empty check ─────────────────────────────────────────── */
-function recheckEmpty(){
-  var grid=document.getElementById('saved-grid'), empty=document.getElementById('saved-empty');
-  if(!grid) return;
-  if(!grid.querySelectorAll('.saved').length){ grid.style.display='none'; empty.style.display='block'; }
+function recheckEmpty() {
+  var grid = document.getElementById('saved-grid'), empty = document.getElementById('saved-empty');
+  if (!grid) return;
+  if (!grid.querySelectorAll('.saved').length) { grid.style.display = 'none'; empty.style.display = 'block'; }
 }
 
-/* ── Render ──────────────────────────────────────────────── */
-function renderSaved(){
-  var all = loadItems();
-  var grid  = document.getElementById('saved-grid');
+/* ── Main Render ─────────────────────────────────────── */
+function renderSaved() {
+  var grid = document.getElementById('saved-grid');
   var empty = document.getElementById('saved-empty');
-  if(!grid || !empty) return;
+  if (!grid || !empty) return;
 
-  updateCounts(all);
+  updateCounts(savedItemsCache);
 
-  var filtered = all.filter(function(item){
-    if(activeTab !== 'all' && item.type !== activeTab) return false;
-    if(searchQuery){
-      var hay = [
-        item.title||'', item.subtitle||'', item.body||'',
-        item.markdown||'', item.summaryTitle||'', item.summaryText||'',
-        item.content||''
-      ].join(' ').toLowerCase();
-      if(hay.indexOf(searchQuery) === -1) return false;
+  var filtered = savedItemsCache.filter(function(item) {
+    if (activeTab !== 'all' && item.type !== activeTab) return false;
+    if (searchQuery) {
+      var hay = [item.title || '', item.subtitle || '', item.body || '', item.markdown || '', item.summaryTitle || '', item.summaryText || '', item.content || ''].join(' ').toLowerCase();
+      if (hay.indexOf(searchQuery) === -1) return false;
     }
     return true;
   });
 
-  if(!filtered.length){
-    grid.style.display  = 'none';
+  if (!filtered.length) {
+    grid.style.display = 'none';
     empty.style.display = 'block';
     return;
   }
 
-  var html = filtered.map(function(item){
-    // Normalize type — handle unexpected casing or spacing
-    var t = (item.type || '').toLowerCase().trim();
-    if(t === 'resume')          return buildResumeCard(item);
-    if(t === 'story')           return buildStoryCard(item);
-    if(t === 'shadow' || t === 'ai-insight') return buildShadowCard(item);
-    if(t === 'holistic-career' || t === 'holistic_career' || t === 'career')
-                                return buildHolisticCard(item);
-    // Fallback: render a generic card so nothing is silently swallowed
-    return buildGenericCard(item);
+  var html = filtered.map(function(item) {
+    try {
+      var t = (item.type || '').toLowerCase().trim();
+      if (t === 'resume') return buildResumeCard(item);
+      if (t === 'story') return buildStoryCard(item);
+      if (t === 'shadow' || t === 'ai-insight') return buildShadowCard(item);
+      if (t === 'holistic-career' || t === 'holistic_career' || t === 'career') return buildHolisticCard(item);
+      return buildGenericCard(item);
+    } catch(err) {
+      console.warn('[saved] card build error for id=' + item.id, err);
+      return buildGenericCard(item);
+    }
   }).join('');
 
-  if(!html.trim()){
-    grid.style.display  = 'none';
-    empty.style.display = 'block';
-    return;
-  }
-
-  grid.style.display  = 'block';
+  grid.style.display = 'block';
   empty.style.display = 'none';
   grid.innerHTML = html;
 }
 
-/* ── Generic fallback card (catches unknown types) ────────── */
-function buildGenericCard(item){
-  var preview = (item.body || item.markdown || item.content || item.summaryText || '').slice(0, 200);
-  return '<div class="saved" id="saved-'+item.id+'" onclick="savedModalOpen(\''+item.id+'\')">'
-    +'<div class="saved-header">'
-    +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🔖</div>'
-    +'<div style="flex:1;min-width:0">'
-    +'<div style="font-size:.82rem;font-weight:700;color:var(--text)">'+esc(item.title||item.summaryTitle||'Saved Item')+'</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+esc(item.type||'unknown')+' · '+relTime(item.savedAt)+'</div>'
-    +'</div>'
-    +'<span class="saved-type-badge" style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);color:var(--accent)">'+esc(item.type||'item')+'</span>'
-    +'</div>'
-    +(preview ? '<div class="saved-body"><div style="font-family:\'Newsreader\',serif;font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(preview)+'</div></div>' : '')
-    +'<div class="saved-footer" onclick="event.stopPropagation()">'
-    +'<button class="saved-delete-btn" onclick="savedDeleteItem(\''+item.id+'\')">'
-    +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>'
-    +'</div></div>';
-}
+window._savedRender = renderSaved;
 
-/* ── Init ────────────────────────────────────────────────── */
-// Defer until DOM is fully ready — avoids race with SPA page injection
-function _initSaved(){
-  if(!document.getElementById('saved-grid')){
-    setTimeout(_initSaved, 100);
-    return;
-  }
-  renderSaved();
-}
-
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', _initSaved);
-} else {
-  _initSaved();
-}
-
-// Re-render when navigating to this page
-document.addEventListener('pageChanged', function(e){
-  if(e.detail === 'saved') renderSaved();
+/* ── Init ────────────────────────────────────────────── */
+document.addEventListener('pageChanged', function(e) {
+  if (e && e.detail === 'saved') renderSaved();
 });
 
-// Also hook into navigateTo if available
-(function _patchNav(){
-  if(typeof window.navigateTo !== 'function'){ setTimeout(_patchNav, 150); return; }
+(function _patchNav() {
+  if (typeof window.navigateTo !== 'function') { setTimeout(_patchNav, 150); return; }
   var _orig = window.navigateTo;
-  window.navigateTo = function(page, event){
+  window.navigateTo = function(page, event) {
     _orig(page, event);
-    if(page === 'saved') setTimeout(renderSaved, 50);
+    if (page === 'saved') setTimeout(renderSaved, 50);
   };
 })();
 
 })();
 </script>
-@endpush\n\n<x-ai-chatbot />
+@endpush
+
+<x-ai-chatbot />
