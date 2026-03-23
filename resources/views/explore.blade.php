@@ -6,6 +6,7 @@
     <title>Explore Community — LifeVault</title>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ time() }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { background: #05060f; color: #e8eaf0; overflow-x: hidden; }
         .explore-nav {
@@ -57,6 +58,19 @@
         .post-time  { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:#6b7a99; }
         .post-title { font-size:.95rem; font-weight:700; margin-bottom:8px; line-height:1.3; color:#e8eaf0; }
         .post-body  { font-family:var(--font-journal); font-size:var(--font-size-journal); line-height:1.7; color:rgba(232,234,240,.75); font-weight:300; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+        .markdown-content p{margin-bottom:.8rem}
+        .markdown-content strong{color:rgba(232,234,240,.95);font-weight:700}
+        .markdown-content em{color:rgba(174,184,210,.8);font-style:italic}
+        .markdown-content blockquote{border-left:3px solid var(--accent);margin:10px 0;padding:8px 14px;background:rgba(79,142,247,.06);border-radius:0 8px 8px 0;font-style:italic;color:rgba(232,234,240,.7)}
+        .markdown-content code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:.82em}
+        .markdown-content ul{padding-left:1.2rem;margin-bottom:.8rem}
+        .markdown-content li{margin-bottom:.3rem}
+        .post-read-more{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block}
+        .post-photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+        .post-photo{width:100px;height:100px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,.1);cursor:pointer;transition:transform .2s}
+        .post-photo:hover{transform:scale(1.04);border-color:#4f8ef7}
+        .post-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+        .tag{font-family:'JetBrains Mono',monospace;font-size:.58rem;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.08em}
         .post-goal-bar  { background:rgba(255,255,255,.06); border-radius:99px; height:6px; overflow:hidden; margin:8px 0; }
         .post-goal-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#4f8ef7,#a78bfa); }
         .post-goal-meta { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:.62rem; color:#6b7a99; margin-top:4px; }
@@ -152,25 +166,56 @@
                    'user';
         }
 
+        function toggleReadMore(pid) {
+            const el = document.getElementById('post-body-' + pid);
+            if (!el) return;
+            if (el.style.webkitLineClamp === '4') {
+                el.style.webkitLineClamp = 'unset';
+                event.target.textContent = 'Read less ↑';
+            } else {
+                el.style.webkitLineClamp = '4';
+                event.target.textContent = 'Read more ↓';
+            }
+        }
+
+
         function renderExplorePost(p) {
             const pid    = p.id;
             const handle = getHandle(p);
             const bc     = TYPE_BADGE_CLASS[p.type] || 'badge-journal';
             const badge  = TYPE_BADGES[p.type]      || p.type;
+            const timeAgo = relativeTime(p.createdAt);
+
+            const origForRepost = p.isRepost && p.originalPostId && window.explorePosts
+                ? window.explorePosts.find(x => x.id === p.originalPostId) : null;
+            const repostAv = origForRepost ? (origForRepost.authorAvatar || '') : (p.originalAuthorAvatar || '');
+            const repostHtml = p.isRepost
+                ? `<div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#34d399;margin-bottom:10px;display:flex;align-items:center;gap:6px">🔁 reposted from <img src="${esc(repostAv)}" style="width:16px;height:16px;border-radius:50%;object-fit:cover" onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'"> <span>${esc(p.originalAuthorName || 'Anonymous')}</span></div>` : '';
 
             let bodyHtml = '';
             if (p.type === 'goal') {
-                bodyHtml =
-                    `<div class="post-goal-bar"><div class="post-goal-fill" style="width:${p.progress||0}%"></div></div>
-                     <div class="post-goal-meta"><span>🎯</span><span>${p.progress||0}% complete</span></div>
-                     ${p.body ? `<div class="post-body" style="margin-top:8px">${esc(p.body)}</div>` : ''}`;
+                bodyHtml = `<div class="post-goal-bar"><div class="post-goal-fill" style="width:${p.progress||0}%"></div></div>
+                  <div class="post-goal-meta"><span>${p.categoryIcon||'🎯'}</span><span>${p.progress||0}% complete</span></div>
+                  ${p.body ? `<div class="post-body">${esc(p.body)}</div>` : ''}`;
+            } else if (p.type === 'task') {
+                bodyHtml = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                  <span>${p.priorityIcon||'✅'}</span>
+                  <span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:#8892b0;text-transform:uppercase">${p.priority||''} priority</span>
+                  ${p.done ? `<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:#34d399">· Done ✓</span>` : ''}
+                </div>
+                ${p.body ? `<div class="post-body">${esc(p.body)}</div>` : ''}`;
             } else {
-                bodyHtml = `<div class="post-body">${esc(p.body || '')}</div>`;
+                const long = (p.body || '').length > 300;
+                const bodyRendered = p.isSharedItem && typeof marked !== 'undefined'
+                    ? marked.parse(p.body || '')
+                    : esc(p.body || '');
+                bodyHtml = `<div class="post-body markdown-content" id="post-body-${pid}" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${bodyRendered}</div>
+                  ${long ? `<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${pid}')">Read more ↓</span>` : ''}
+                  ${p.moodEmoji ? `<div style="margin-top:8px;font-size:.8rem;color:#8892b0;font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>` : ''}
+                  ${p.photoUrls?.length ? `<div class="post-photos" onclick="event.stopPropagation()">${p.photoUrls.map(u => `<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();window.location.href='/'">`).join('')}</div>` : ''}
+                  ${p.tags?.length ? `<div class="post-tags" onclick="event.stopPropagation()">${p.tags.map(t => `<span class="tag" style="background:rgba(79,142,247,.12);color:#4f8ef7">${esc(t)}</span>`).join('')}</div>` : ''}`;
             }
 
-            // NOTE: onclick is on the card root via data-post-id delegation below,
-            // NOT as an inline attribute — this avoids the race condition where
-            // openExpandedPost fires before window.explorePosts is populated.
             return `
 <div class="post-card" data-post-id="${pid}">
     <div class="post-header">
@@ -183,17 +228,20 @@
                 <span class="post-author-username">@${esc(handle)}</span>
                 <span class="post-type-badge ${bc}">${esc(badge)}</span>
             </div>
-            <div class="post-time">${relativeTime(p.createdAt)}</div>
+            <div class="post-time">${timeAgo}</div>
         </div>
     </div>
     ${p.title ? `<div class="post-title">${esc(p.title)}</div>` : ''}
-    ${bodyHtml}
+    ${repostHtml}${bodyHtml}
     <div class="post-actions">
         <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
-            🤍 <span class="post-action-count">${(p.likes||[]).length||0}</span>
+            🤍 <span class="post-action-count">${(p.likes||[]).length||''}</span>
         </button>
         <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
             💬 <span class="post-action-count">${p.commentCount||0}</span>
+        </button>
+        <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
+            🔁 <span class="post-action-count">${p.repostCount||''}</span>
         </button>
         <span class="guest-lock">🔒 Sign in to interact</span>
     </div>
