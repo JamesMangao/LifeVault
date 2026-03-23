@@ -56,6 +56,14 @@
 .post-time{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted)}
 .post-title{font-size:.95rem;font-weight:700;letter-spacing:-.01em;margin-bottom:8px;line-height:1.3}
 .post-body{font-family:'Newsreader',serif;font-size:.9rem;line-height:1.7;color:rgba(232,234,240,.75);font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.post-body.is-shared{display:block;overflow:visible;-webkit-line-clamp:unset}
+.markdown-content p{margin-bottom:.8rem}
+.markdown-content strong{color:rgba(232,234,240,.95);font-weight:700}
+.markdown-content em{color:rgba(174,184,210,.8);font-style:italic}
+.markdown-content blockquote{border-left:3px solid var(--accent);margin:10px 0;padding:8px 14px;background:rgba(79,142,247,.06);border-radius:0 8px 8px 0;font-style:italic;color:rgba(232,234,240,.7)}
+.markdown-content code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:.82em}
+.markdown-content ul{padding-left:1.2rem;margin-bottom:.8rem}
+.markdown-content li{margin-bottom:.3rem}
 .post-read-more{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block}
 .post-photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .post-photo{width:100px;height:100px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer;transition:transform .2s}
@@ -956,9 +964,15 @@ body.guest-access .guest-login-nudge {
         </div>
         ${p.body?`<div class="post-body">${esc(p.body)}</div>`:''}`;
     } else {
-      const long=(p.body||'').length>300;
-      body=`<div class="post-body" id="post-body-${pid}"${long?' style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden"':''}>${esc(p.body||'')}</div>
-        ${long?`<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${pid}')">Read more ↓</span>`:''}
+      const long = (p.body||'').length > 300;
+      const bodyRendered = p.isSharedItem && typeof marked !== 'undefined'
+        ? marked.parse(p.body || '')
+        : esc(p.body || '');
+      const clampStyle = (!p.isSharedItem && long)
+        ? ' style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden"'
+        : '';
+      body=`<div class="post-body${p.isSharedItem?' is-shared markdown-content':''}" id="post-body-${pid}"${clampStyle}>${bodyRendered}</div>
+        ${(!p.isSharedItem && long)?`<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${pid}')">Read more ↓</span>`:''}
         ${p.moodEmoji?`<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>`:''}
         ${p.photoUrls?.length?`<div class="post-photos" onclick="event.stopPropagation()">${p.photoUrls.map(u=>`<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${esc(u)}')">`).join('')}</div>`:''}
         ${p.tags?.length?`<div class="post-tags" onclick="event.stopPropagation()">${p.tags.map(t=>`<span class="tag" style="background:rgba(79,142,247,.12);color:var(--accent)">${esc(t)}</span>`).join('')}</div>`:''}`;
