@@ -865,13 +865,13 @@ body.fx-glow .lv-card:hover {
 .lv-faq-item:hover{background:rgba(124,58,237,.25);border-color:rgba(167,139,250,.6);color:#fff;transform:translateY(-1px)}
 .lv-chat-msg{display:flex;gap:8px;animation:lv-fadeup .25s ease}
 .lv-chat-msg.lv-chat-user{flex-direction:row-reverse}
-.lv-chat-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:var(--font-size-journal);line-height:1.6;font-family:var(--font-journal)}
+.lv-chat-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:.85rem;line-height:1.6;font-family:var(--font-journal)}
 .lv-chat-bubble strong{font-weight:700;color:#f0f2ff}
 .lv-chat-bubble em{font-style:italic;color:#c4b5fd}
 .lv-chat-bubble ul{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:5px}
 .lv-chat-bubble ul li{display:flex;gap:7px;align-items:flex-start}
 .lv-chat-bubble ul li::before{content:'✦';color:#a78bfa;flex-shrink:0;font-size:.65rem;margin-top:3px}
-.lv-chat-bubble code{background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px;font-size:.75rem;font-family:'JetBrains Mono',monospace}
+.lv-chat-bubble code{background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px;font-size:.72rem;font-family:'JetBrains Mono',monospace}
 .lv-chat-bubble p{margin-bottom:6px}
 .lv-chat-bubble p:last-child{margin-bottom:0}
 .lv-chat-msg.lv-chat-ai .lv-chat-bubble{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);color:rgba(232,234,240,.85);border-radius:4px 18px 18px 18px}
@@ -886,7 +886,7 @@ body.fx-glow .lv-card:hover {
 .lv-chat-typing span:nth-child(3){animation-delay:.3s}
 @keyframes lv-typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
 #lv-chatbot-input-area{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);flex-shrink:0}
-#lv-chatbot-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:99px;padding:10px 16px;font-size:.82rem;color:#f0f2ff;font-family:var(--font-journal);outline:none;transition:border-color .2s,box-shadow .2s}
+#lv-chatbot-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:99px;padding:10px 16px;font-size:.78rem;color:#f0f2ff;font-family:var(--font-journal);outline:none;transition:border-color .2s,box-shadow .2s}
 #lv-chatbot-input::placeholder{color:#4a5270}
 #lv-chatbot-input:focus{border-color:rgba(124,58,237,.5);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
 #lv-chatbot-send{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,#7c3aed,#4f8ef7);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .2s,box-shadow .2s}
