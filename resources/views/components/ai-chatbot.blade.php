@@ -3,6 +3,7 @@
 ════════════════════════════════════════════ --}}
 <button id="lv-chat-fab" onclick="lvToggleChatbot()" title="Chat with LifeVault AI">
     <span id="lv-chat-fab-icon">🤖</span>
+    <span class="lv-chat-fab-text">Ask AI</span>
 </button>
 
 {{-- ════════════════════════════════════════════
@@ -82,20 +83,70 @@
     position: fixed;
     bottom: 32px; right: 32px;
     z-index: 500;
-    width: 58px; height: 58px;
-    border-radius: 50%; border: none; cursor: pointer;
+    height: 58px; width: 58px; 
+    border-radius: 29px; border: none; cursor: pointer;
     background: linear-gradient(135deg, #7c3aed, #4f8ef7);
+    color: white;
     box-shadow: 0 8px 32px rgba(124,58,237,.5);
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: flex-start;
     font-size: 1.5rem;
-    transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
+    transition: all .35s cubic-bezier(.34,1.56,.64,1);
+    overflow: hidden; padding: 0;
+    animation: lv-fab-pulse 2.5s infinite;
 }
+
+#lv-chat-fab:after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
+    transform: skewX(-20deg);
+    transition: all .5s;
+}
+
+#lv-chat-fab:hover:after {
+    left: 150%;
+    transition: all 1s ease-in-out;
+}
+
 #lv-chat-fab:hover {
-    transform: scale(1.12) translateY(-3px);
+    width: 140px;
+    transform: translateY(-3px);
     box-shadow: 0 14px 40px rgba(124,58,237,.65), 0 0 0 8px rgba(124,58,237,.1);
+    animation: none;
 }
+
+#lv-chat-fab-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 58px; height: 58px;
+    flex-shrink: 0;
+    transition: transform 0.3s;
+}
+
+.lv-chat-fab-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 1.05rem;
+    white-space: nowrap;
+    opacity: 0; transform: translateX(-10px);
+    transition: all 0.3s cubic-bezier(.34,1.56,.64,1);
+}
+
+#lv-chat-fab:hover .lv-chat-fab-text {
+    opacity: 1; transform: translateX(0);
+}
+
+#lv-chat-fab:hover #lv-chat-fab-icon {
+    transform: scale(1.1) rotate(-10deg);
+}
+
 #lv-chat-fab:active { transform: scale(.95); }
-#lv-chat-fab.lv-chat-open { background: linear-gradient(135deg,#4b5563,#374151); }
+#lv-chat-fab.lv-chat-open { 
+    background: linear-gradient(135deg,#4b5563,#374151); 
+    width: 58px; border-radius: 50%;
+    animation: none;
+}
+#lv-chat-fab.lv-chat-open .lv-chat-fab-text { display: none; }
+#lv-chat-fab.lv-chat-open #lv-chat-fab-icon { transform: rotate(90deg) scale(0.9); }
 
 /* ══════════════════════ OVERLAY ══════════════════════ */
 #lv-chatbot-overlay {
@@ -292,7 +343,7 @@
 .lv-chat-msg.lv-chat-user { flex-direction: row-reverse; }
 .lv-chat-bubble {
     max-width: 80%; padding: 10px 14px;
-    border-radius: 18px; font-size: .82rem; line-height: 1.6;
+    border-radius: 18px; font-size: .85rem; line-height: 1.6;
     font-family: 'Newsreader', serif;
 }
 .lv-chat-bubble strong { font-weight: 700; color: #f0f2ff; }
@@ -308,7 +359,7 @@
 }
 .lv-chat-bubble code {
     background: rgba(255,255,255,.1); padding: 1px 5px;
-    border-radius: 4px; font-size: .75rem;
+    border-radius: 4px; font-size: .72rem;
     font-family: 'JetBrains Mono', monospace;
 }
 .lv-chat-bubble p { margin-bottom: 6px; }
@@ -358,6 +409,11 @@
 }
 
 /* ══════════════════════ KEYFRAMES ══════════════════════ */
+@keyframes lv-fab-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(124,58,237, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(124,58,237, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124,58,237, 0); }
+}
 @keyframes lv-typing {
     0%,60%,100% { transform: translateY(0); opacity: .4; }
     30%          { transform: translateY(-6px); opacity: 1; }
