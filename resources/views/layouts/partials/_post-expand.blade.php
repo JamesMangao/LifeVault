@@ -325,6 +325,10 @@
             var pid = card.getAttribute('data-post-id');
             card.addEventListener('click', function(e) {
                 if (e.target.closest('.post-action-btn,.post-author-btn,.post-read-more,.post-photos,.post-tags')) return;
+                if (window.isGuestMode && typeof requireSignIn === 'function') {
+                    requireSignIn('view the full post details');
+                    return;
+                }
                 window.openExpandedPost(pid);
             });
         });

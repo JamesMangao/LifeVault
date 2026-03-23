@@ -327,18 +327,6 @@
             }
         }
 
-        // Delegation on #feed-list — fires AFTER explorePosts is populated
-        document.getElementById('feed-list').addEventListener('click', function(e) {
-            const card = e.target.closest('.post-card[data-post-id]');
-            if (!card) return;
-            // Ignore action buttons
-            if (e.target.closest('.post-action-btn, .guest-lock, .post-photo, .post-author-name')) return;
-            // If they click on the post body to expand, also prompt them to log in
-            if (e.target.closest('.post-read-more')) return; // let read more happen inline
-            
-            requireSignIn('view the full post details');
-        });
-
         loadExploreFeed();
     </script>
 </body>
