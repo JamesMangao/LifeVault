@@ -128,12 +128,41 @@
                 scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent"></div>
 
     <div id="saved-modal-footer"
-         style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+         style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;
                 padding:13px 22px;
                 border-top:1px solid var(--border,rgba(255,255,255,.08));
                 flex-shrink:0;background:rgba(255,255,255,.015)"></div>
   </div>
 </div>
+
+{{-- ══════════════════════════════════════════════
+     SHARE CHOICE MODAL
+═══════════════════════════════════════════════ --}}
+<div id="saved-share-choice-overlay"
+     onclick="if(event.target===this) this.style.display='none'"
+     style="display:none;position:fixed;inset:0;z-index:10001;
+            background:rgba(8,10,18,0.85);backdrop-filter:blur(12px);
+            align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:420px;padding:32px;box-shadow:0 40px 100px rgba(0,0,0,0.6);animation:saved-in 0.3s ease both;">
+        <div style="text-align:center;margin-bottom:24px">
+            <div style="font-size:2.5rem;margin-bottom:12px">↗️</div>
+            <h3 style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:8px">Share Item</h3>
+            <p style="font-family:var(--font-journal);font-size:0.9rem;color:var(--muted);font-style:italic">Where would you like to share this?</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <button class="btn btn-primary" id="btn-share-community" style="padding:16px;justify-content:center;font-size:0.95rem">
+                <span>🌐</span> Share to Community
+            </button>
+            <button class="btn" id="btn-share-journal" style="padding:16px;justify-content:center;font-size:0.95rem;background:rgba(255,255,255,0.05)">
+                <span>📓</span> Save to Journal
+            </button>
+            <button class="btn" onclick="document.getElementById('saved-share-choice-overlay').style.display='none'" style="margin-top:8px;justify-content:center;border:none;background:transparent;color:var(--muted);font-size:0.8rem">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
 
 <style>
 @keyframes saved-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
@@ -382,9 +411,121 @@ window.savedCopyStory = function(id) {
     ta.select();
     document.execCommand('copy');
     ta.remove();
-    if (typeof window.toast === 'function') window.toast('Copied! 📋');
   }
 };
+
+/* ════════════════════════════════════════════════════════════
+   SHARING LOGIC
+════════════════════════════════════════════════════════════ */
+
+window.savedShareItem = function(id) {
+  var item = savedItemsCache.find(function(i) { return i.id === id; });
+  if (!item) return;
+
+  var overlay = document.getElementById('saved-share-choice-overlay');
+  if (!overlay) return;
+
+  overlay.style.display = 'flex';
+
+  var btnComm = document.getElementById('btn-share-community');
+  var btnJour = document.getElementById('btn-share-journal');
+
+  btnComm.onclick = function() {
+    overlay.style.display = 'none';
+    shareToCommunity(item);
+  };
+
+  btnJour.onclick = function() {
+    overlay.style.display = 'none';
+    shareToJournal(item);
+  };
+};
+
+async function shareToCommunity(item) {
+  if (!currentUser || !window.db || !window._fbFS) {
+    if (typeof window.toast === 'function') window.toast('Login required', '🔐');
+    return;
+  }
+
+  window.confirmAction({
+    emoji: '🌐',
+    title: 'Share to Community?',
+    body: 'This will post a summary of your report to the public community feed. Continue?',
+    confirm: 'Post to Feed',
+    onConfirm: async (close) => {
+      try {
+        const { addDoc, collection, serverTimestamp } = window._fbFS;
+        const p = window.userProfile || {};
+        const authorName = p.displayName || currentUser.displayName || 'Anonymous';
+        const authorAvatar = p.avatarUrl || currentUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=4f8ef7&color=fff`;
+        
+        // Prepare content
+        let shareTitle = item.title || item.summaryTitle || 'My Report';
+        let shareBody = '';
+        
+        if (item.type === 'story') {
+            shareBody = item.body || '';
+        } else if (item.type === 'shadow') {
+            shareBody = (item.summaryText || '') + '\n\n' + (item.patterns || []).map(p => p.emoji + ' ' + p.name).join(', ');
+        } else {
+            shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim().slice(0, 500) + '...';
+        }
+
+        await addDoc(collection(window.db, 'community_posts'), {
+          type: 'thought',
+          title: 'Shared ' + (item.type.charAt(0).toUpperCase() + item.type.slice(1)) + ': ' + shareTitle,
+          body: shareBody,
+          authorId: currentUser.uid,
+          authorName,
+          authorAvatar,
+          authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
+          likes: [],
+          commentCount: 0,
+          repostCount: 0,
+          createdAt: serverTimestamp(),
+          isSharedItem: true,
+          originalItemId: item.id
+        });
+
+        if (typeof window.toast === 'function') window.toast('Posted to Community! 🌐');
+      } catch (e) {
+        console.error('[saved] Share community error:', e);
+        if (typeof window.toast === 'function') window.toast('Error sharing', '❌');
+      }
+      close();
+    }
+  });
+}
+
+function shareToJournal(item) {
+  if (typeof window.openJournalModal !== 'function') {
+      if (typeof window.toast === 'function') window.toast('Journal unavailable', '❌');
+      return;
+  }
+
+  // Pre-fill journal modal
+  let jTitle = document.getElementById('journal-title');
+  let jContent = document.getElementById('journal-content');
+  let jTags = document.getElementById('journal-tags');
+
+  if (jTitle) jTitle.value = 'Reflecting on: ' + (item.title || item.summaryTitle || 'My Report');
+  if (jContent) {
+      if (item.type === 'story') {
+          jContent.value = item.body || '';
+      } else {
+          jContent.value = "--- REPORT SUMMARY ---\n" + (item.summaryText || '') + "\n\n--- FULL REPORT ---\n" + (item.markdown || item.content || '');
+      }
+  }
+  if (jTags) jTags.value = 'saved-item, ' + item.type;
+
+  // Set mood if available or just default
+  if (typeof window.selectMood === 'function') {
+      window.selectMood(4, '🙂'); // Good/Reflective
+  }
+
+  window.openJournalModal();
+  if (typeof window.toast === 'function') window.toast('Pre-filled in Journal! 📓');
+}
 
 /* ── Filter / Search ────────────────────────────────────── */
 window.savedFilter = function(tab) {
@@ -446,6 +587,7 @@ window.savedModalOpen = function(id) {
   if (item.type === 'story') {
     fh += '<button onclick="savedCopyStory(\'' + id + '\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.28);color:var(--lavender)">📋 Copy Story</button>';
   }
+  fh += '<button onclick="savedShareItem(\'' + id + '\')" class="saved-view-btn" style="border-color:rgba(45,212,191,.28);color:var(--teal)">↗ Share</button>';
   fh += '<button class="saved-delete-btn" onclick="savedDeleteItem(\'' + id + '\')">'
     + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg>Delete</button>';
   fh += '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">'
@@ -619,7 +761,9 @@ function buildResumeCard(item) {
     + '</div>'
     + (preview ? '<div style="font-family:var(--font-journal);font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
     + '</div>'
-    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') 
+    + '<button class="saved-view-btn" onclick="event.stopPropagation();savedShareItem(\'' + item.id + '\')" style="border-color:rgba(45,212,191,.2);color:var(--teal)">↗ Share</button>'
+    + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
     + '</div></div>';
 }
@@ -646,6 +790,7 @@ function buildStoryCard(item) {
     + '<div style="font-family:var(--font-journal);font-size:.85rem;color:rgba(232,234,240,.72);line-height:1.75;font-weight:300;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + (preview.length >= 240 ? '…' : '') + '</div>'
     + '</div>'
     + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'Read Full Story')
+    + '<button onclick="event.stopPropagation();savedShareItem(\'' + item.id + '\')" class="saved-view-btn" style="border-color:rgba(45,212,191,.2);color:var(--teal)">↗ Share</button>'
     + '<button onclick="event.stopPropagation();savedCopyStory(\'' + item.id + '\')" class="saved-view-btn" style="border-color:rgba(167,139,250,.25);color:var(--lavender)">📋 Copy</button>'
     + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
@@ -678,7 +823,9 @@ function buildShadowCard(item) {
     + '</div>'
     + '<div style="display:flex;gap:5px;flex-wrap:wrap">' + badges + '</div>'
     + '</div>'
-    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Analysis') + delBtn(item.id)
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Analysis') 
+    + '<button class="saved-view-btn" onclick="event.stopPropagation();savedShareItem(\'' + item.id + '\')" style="border-color:rgba(45,212,191,.2);color:var(--teal)">↗ Share</button>'
+    + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
     + '</div></div>';
 }
@@ -704,7 +851,9 @@ function buildHolisticCard(item) {
     + '</div>'
     + (preview ? '<div style="font-family:var(--font-journal);font-size:.8rem;color:var(--muted);line-height:1.65;font-weight:300;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + esc(preview) + '…</div>' : '')
     + '</div>'
-    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') + delBtn(item.id)
+    + '<div class="saved-footer" onclick="event.stopPropagation()">' + viewBtn(item.id, 'View Report') 
+    + '<button class="saved-view-btn" onclick="event.stopPropagation();savedShareItem(\'' + item.id + '\')" style="border-color:rgba(45,212,191,.2);color:var(--teal)">↗ Share</button>'
+    + delBtn(item.id)
     + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.54rem;color:var(--muted);opacity:.5">' + dateStr(item.savedAt) + '</span>'
     + '</div></div>';
 }
