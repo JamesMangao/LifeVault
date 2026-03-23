@@ -464,17 +464,37 @@ async function shareToCommunity(item) {
         let shareBody = '';
         
         if (item.type === 'story') {
-            shareBody = item.body || '';
+            const SM = {memoir:'Memoir', literary:'Literary', poetic:'Poetic', cinematic:'Cinematic', epistolary:'Epistolary', stream:'Stream', mythic:'Mythic', detective:'Self-Discovery'};
+            const RL = {last7:'Last 7 Days', last30:'Last 30 Days', last90:'Last 3 Months', all:'All Time'};
+            shareBody = `**Style:** ${SM[item.style] || item.style || 'Standard'}\n` +
+                        `**Range:** ${RL[item.range] || 'All'}\n` +
+                        `**Themes:** ${(item.themes || []).join(', ')}\n\n` +
+                        (item.body || '');
         } else if (item.type === 'shadow') {
-            shareBody = (item.summaryText || '') + '\n\n' + (item.patterns || []).map(p => p.emoji + ' ' + p.name).join(', ');
+            shareBody = `**Awareness Score:** ${item.awarenessScore || 0}%\n\n` +
+                        (item.summaryText || '') + '\n\n' +
+                        '**--- DETECTED PATTERNS ---**\n' +
+                        (item.patterns || []).map(p => `${p.emoji || '🎭'} **${p.name}** (${p.severity || 1}/5)\n${p.description || ''}`).join('\n\n') +
+                        '\n\n**--- COMPASSIONATE REFRAMES ---**\n' +
+                        (item.reframes || []).map(r => `*Shadow:* "${r.shadow}"\n*Truth:* ${r.reframe}`).join('\n\n') +
+                        '\n\n**--- HIDDEN STRENGTHS ---**\n' +
+                        (item.strengths || []).join(', ');
+        } else if (item.type === 'resume' || item.type === 'holistic-career') {
+            const s = item.score || 0;
+            const lbl = item.type === 'holistic-career'
+              ? (s >= 80 ? 'Highly Aligned' : s >= 60 ? 'Moderately Aligned' : s >= 40 ? 'Partially Aligned' : 'Misaligned')
+              : (s >= 75 ? 'Strong Match' : s >= 50 ? 'Moderate Match' : 'Needs Work');
+            
+            shareBody = `**Score:** ${s}/100\n` +
+                        `**Analysis:** ${lbl}\n\n` +
+                        (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim();
         } else {
-            // Share the full content
             shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim();
         }
 
         await addDoc(collection(window.db, 'community_posts'), {
           type: 'thought',
-          title: 'Shared ' + (item.type.charAt(0).toUpperCase() + item.type.slice(1)) + ': ' + shareTitle,
+          title: 'Shared ' + (item.type.charAt(0).toUpperCase() + item.type.slice(1).replace('-',' ')) + ': ' + shareTitle,
           body: shareBody,
           authorId: currentUser.uid,
           authorName,
@@ -512,9 +532,30 @@ function shareToJournal(item) {
   if (jTitle) jTitle.value = 'Reflecting on: ' + (item.title || item.summaryTitle || 'My Report');
   if (jContent) {
       if (item.type === 'story') {
-          jContent.value = item.body || '';
+          const SM = {memoir:'Memoir', literary:'Literary', poetic:'Poetic', cinematic:'Cinematic', epistolary:'Epistolary', stream:'Stream', mythic:'Mythic', detective:'Self-Discovery'};
+          const RL = {last7:'Last 7 Days', last30:'Last 30 Days', last90:'Last 3 Months', all:'All Time'};
+          jContent.value = `STYLE: ${SM[item.style] || item.style || 'Standard'}\n` +
+                           `RANGE: ${RL[item.range] || 'All'}\n` +
+                           `THEMES: ${(item.themes || []).join(', ')}\n\n` +
+                           (item.body || '');
       } else if (item.type === 'shadow') {
-           jContent.value = "--- ANALYSIS SUMMARY ---\n" + (item.summaryText || '') + "\n\n--- DETECTED PATTERNS ---\n" + (item.patterns || []).map(p => p.emoji + ' ' + p.name).join(', ') + "\n\n--- FULL ANALYSIS ---\n" + (item.markdown || item.content || '');
+           jContent.value = `--- SHADOW ANALYSIS (Awareness: ${item.awarenessScore || 0}%) ---\n\n` +
+                            (item.summaryText || '') + "\n\n" +
+                            "--- DETECTED PATTERNS ---\n" +
+                            (item.patterns || []).map(p => `${p.emoji || '🎭'} ${p.name} (${p.severity || 1}/5): ${p.description || ''}`).join('\n\n') +
+                            "\n\n--- COMPASSIONATE REFRAMES ---\n" +
+                            (item.reframes || []).map(r => `Shadow: "${r.shadow}"\nTruth: ${r.reframe}`).join('\n\n') +
+                            "\n\n--- HIDDEN STRENGTHS ---\n" +
+                            (item.strengths || []).join(', ') +
+                            "\n\n--- FULL ANALYSIS ---\n" + (item.markdown || item.content || '');
+      } else if (item.type === 'resume' || item.type === 'holistic-career') {
+           const s = item.score || 0;
+           const lbl = item.type === 'holistic-career'
+              ? (s >= 80 ? 'Highly Aligned' : s >= 60 ? 'Moderately Aligned' : s >= 40 ? 'Partially Aligned' : 'Misaligned')
+              : (s >= 75 ? 'Strong Match' : s >= 50 ? 'Moderate Match' : 'Needs Work');
+           jContent.value = `SCORE: ${s}/100\n` +
+                            `RESULT: ${lbl}\n\n` +
+                            "--- FULL REPORT ---\n" + (item.markdown || item.content || '');
       } else {
           jContent.value = "--- REPORT SUMMARY ---\n" + (item.summaryText || '') + "\n\n--- FULL REPORT ---\n" + (item.markdown || item.content || '');
       }
