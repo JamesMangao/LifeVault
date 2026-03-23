@@ -90,9 +90,53 @@
             text-decoration: none; display: inline-block; box-shadow: 0 4px 20px rgba(124,58,237,.3);
         }
         .lv-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,.5); }
+
+        /* Auth Prompt Modal */
+        .auth-prompt-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(5,6,15,.85); backdrop-filter: blur(8px);
+            z-index: 1000; display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity .25s ease;
+        }
+        .auth-prompt-overlay.show { display: flex; opacity: 1; }
+        .auth-prompt-modal {
+            background: #131929; border: 1px solid rgba(255,255,255,.07);
+            border-radius: 24px; width: 90%; max-width: 400px; padding: 32px;
+            text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.4);
+            transform: scale(.95) translateY(10px); transition: all .25s cubic-bezier(.34,1.56,.64,1);
+        }
+        .auth-prompt-overlay.show .auth-prompt-modal { transform: scale(1) translateY(0); }
+        .auth-icon { font-size: 3rem; margin-bottom: 16px; display: inline-block; }
+        .auth-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 12px; color: #f0f2ff; letter-spacing: -.02em; }
+        .auth-text { font-size: .95rem; color: #8892b0; margin-bottom: 28px; line-height: 1.5; }
+        .auth-actions { display: flex; gap: 12px; }
+        .auth-btn-cancel {
+            flex: 1; padding: 12px; border-radius: 12px; font-weight: 600;
+            background: rgba(255,255,255,.05); color: #8892b0; border: none;
+            cursor: pointer; transition: all .15s;
+        }
+        .auth-btn-cancel:hover { background: rgba(255,255,255,.1); color: #e8eaf0; }
+        .auth-btn-confirm {
+            flex: 1; padding: 12px; border-radius: 12px; font-weight: 700;
+            background: linear-gradient(135deg, #7c3aed, #4338ca); color: #fff; border: none;
+            cursor: pointer; transition: all .2s; box-shadow: 0 4px 15px rgba(124,58,237,.25);
+        }
+        .auth-btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124,58,237,.4); }
     </style>
 </head>
 <body>
+
+    <div class="auth-prompt-overlay" id="auth-prompt" onclick="closeAuthPrompt(event)">
+        <div class="auth-prompt-modal" onclick="event.stopPropagation()">
+            <div class="auth-icon">🚀</div>
+            <h3 class="auth-title">Sign in to LifeVault</h3>
+            <p class="auth-text" id="auth-prompt-text">You need to sign in to do that.</p>
+            <div class="auth-actions">
+                <button class="auth-btn-cancel" onclick="closeAuthPrompt()">Cancel</button>
+                <button class="auth-btn-confirm" onclick="window.location.href='/'">Sign In →</button>
+            </div>
+        </div>
+    </div>
 
     <nav class="explore-nav">
         <a href="/" class="explore-logo">
@@ -166,6 +210,23 @@
                    'user';
         }
 
+        function requireSignIn(actionText) {
+            var msg = actionText ? `Sign in to ${actionText} and connect with the community.` : 'Join LifeVault to unlock this feature.';
+            document.getElementById('auth-prompt-text').textContent = msg;
+            var overlay = document.getElementById('auth-prompt');
+            overlay.style.display = 'flex';
+            // Force reflow
+            void overlay.offsetWidth;
+            overlay.classList.add('show');
+        }
+
+        function closeAuthPrompt(e) {
+            if (e && e.target !== document.getElementById('auth-prompt')) return;
+            var overlay = document.getElementById('auth-prompt');
+            overlay.classList.remove('show');
+            setTimeout(() => { overlay.style.display = 'none'; }, 250);
+        }
+
         function toggleReadMore(pid) {
             const el = document.getElementById('post-body-' + pid);
             if (!el) return;
@@ -212,7 +273,7 @@
                 bodyHtml = `<div class="post-body markdown-content" id="post-body-${pid}" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${bodyRendered}</div>
                   ${long ? `<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${pid}')">Read more ↓</span>` : ''}
                   ${p.moodEmoji ? `<div style="margin-top:8px;font-size:.8rem;color:#8892b0;font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>` : ''}
-                  ${p.photoUrls?.length ? `<div class="post-photos" onclick="event.stopPropagation()">${p.photoUrls.map(u => `<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();window.location.href='/'">`).join('')}</div>` : ''}
+                  ${p.photoUrls?.length ? `<div class="post-photos" onclick="event.stopPropagation()">${p.photoUrls.map(u => `<img src="${esc(u)}" class="post-photo" onclick="event.stopPropagation();requireSignIn('view this photo')">`).join('')}</div>` : ''}
                   ${p.tags?.length ? `<div class="post-tags" onclick="event.stopPropagation()">${p.tags.map(t => `<span class="tag" style="background:rgba(79,142,247,.12);color:#4f8ef7">${esc(t)}</span>`).join('')}</div>` : ''}`;
             }
 
@@ -221,9 +282,10 @@
     <div class="post-header">
         <img src="${esc(p.authorAvatar || '')}"
              class="post-avatar"
+             style="cursor:pointer" onclick="event.stopPropagation();requireSignIn('view this profile')"
              onerror="this.src='https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff'">
         <div class="post-meta">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;cursor:pointer" onclick="event.stopPropagation();requireSignIn('view this profile')">
                 <span class="post-author-name">${esc(p.authorName || 'Anonymous')}</span>
                 <span class="post-author-username">@${esc(handle)}</span>
                 <span class="post-type-badge ${bc}">${esc(badge)}</span>
@@ -234,13 +296,13 @@
     ${p.title ? `<div class="post-title">${esc(p.title)}</div>` : ''}
     ${repostHtml}${bodyHtml}
     <div class="post-actions">
-        <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
+        <button class="post-action-btn" onclick="event.stopPropagation();requireSignIn('like this post')">
             🤍 <span class="post-action-count">${(p.likes||[]).length||''}</span>
         </button>
-        <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
+        <button class="post-action-btn" onclick="event.stopPropagation();requireSignIn('comment on this post')">
             💬 <span class="post-action-count">${p.commentCount||0}</span>
         </button>
-        <button class="post-action-btn" onclick="event.stopPropagation();window.location.href='/'">
+        <button class="post-action-btn" onclick="event.stopPropagation();requireSignIn('repost this')">
             🔁 <span class="post-action-count">${p.repostCount||''}</span>
         </button>
         <span class="guest-lock">🔒 Sign in to interact</span>
@@ -270,11 +332,11 @@
             const card = e.target.closest('.post-card[data-post-id]');
             if (!card) return;
             // Ignore action buttons
-            if (e.target.closest('.post-action-btn, .guest-lock')) return;
-            const pid = card.getAttribute('data-post-id');
-            if (pid && typeof window.openExpandedPost === 'function') {
-                window.openExpandedPost(pid);
-            }
+            if (e.target.closest('.post-action-btn, .guest-lock, .post-photo, .post-author-name')) return;
+            // If they click on the post body to expand, also prompt them to log in
+            if (e.target.closest('.post-read-more')) return; // let read more happen inline
+            
+            requireSignIn('view the full post details');
         });
 
         loadExploreFeed();
