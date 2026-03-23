@@ -102,9 +102,9 @@
     position: fixed;
     bottom: 104px; right: 32px;
     z-index: 499;
-    width: 390px;
+    width: 350px;
     /* Fixed height — NOT max-height — guarantees all rows always have space */
-    height: 580px;
+    height: 520px;
     background: linear-gradient(145deg, rgba(13,15,35,.97), rgba(18,20,46,.97));
     border: 1px solid rgba(124,58,237,.3);
     border-radius: 24px;
@@ -124,15 +124,15 @@
 
 /* ══════════════════════ CONTAINER — CSS Grid ══════════════════════ */
 /*
-   Row breakdown (total = 580px):
+   Row breakdown (total = 520px):
    1. header     — auto  (~69px)
    2. messages   — 1fr   (fills leftover space, scrolls)
-   3. faqs       — 120px (HARD fixed, never squashed)
+   3. faqs       — 100px (HARD fixed, never squashed)
    4. input-area — auto  (~62px)
 */
 #lv-chatbot-container {
     display: grid;
-    grid-template-rows: auto 1fr 120px auto;
+    grid-template-rows: auto 1fr 100px auto;
     height: 100%;
     overflow: hidden;
 }
