@@ -468,7 +468,8 @@ async function shareToCommunity(item) {
         } else if (item.type === 'shadow') {
             shareBody = (item.summaryText || '') + '\n\n' + (item.patterns || []).map(p => p.emoji + ' ' + p.name).join(', ');
         } else {
-            shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim().slice(0, 500) + '...';
+            // Share the full content
+            shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim();
         }
 
         await addDoc(collection(window.db, 'community_posts'), {
@@ -512,6 +513,8 @@ function shareToJournal(item) {
   if (jContent) {
       if (item.type === 'story') {
           jContent.value = item.body || '';
+      } else if (item.type === 'shadow') {
+           jContent.value = "--- ANALYSIS SUMMARY ---\n" + (item.summaryText || '') + "\n\n--- DETECTED PATTERNS ---\n" + (item.patterns || []).map(p => p.emoji + ' ' + p.name).join(', ') + "\n\n--- FULL ANALYSIS ---\n" + (item.markdown || item.content || '');
       } else {
           jContent.value = "--- REPORT SUMMARY ---\n" + (item.summaryText || '') + "\n\n--- FULL REPORT ---\n" + (item.markdown || item.content || '');
       }

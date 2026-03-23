@@ -1346,8 +1346,27 @@ window.getResolvedAuthorAvatar = function (uid, authorName, storedAvatar) {
     const n = prof.displayName || authorName || cu.displayName || 'U';
     return prof.avatarUrl || cu.photoURL || uiAvatarFromName(n);
   }
-  if (authorAvatarCache[uid]) return authorAvatarCache[uid];
+  if (authorAvatarCache[uid]?.avatarUrl) return authorAvatarCache[uid].avatarUrl;
   return storedAvatar || uiAvatarFromName(authorName);
+};
+
+window.getResolvedAuthorName = function (uid, storedName) {
+  if (!uid) return storedName || 'Anonymous';
+  const cu = window.currentUser;
+  const prof = window.userProfile || {};
+  if (cu && uid === cu.uid) return prof.displayName || cu.displayName || storedName || 'Anonymous';
+  if (authorAvatarCache[uid]?.displayName) return authorAvatarCache[uid].displayName;
+  return storedName || 'Anonymous';
+};
+
+window.getResolvedAuthorUsername = function (uid, storedUsername, authorName) {
+  if (!uid) return storedUsername || '';
+  const cu = window.currentUser;
+  const prof = window.userProfile || {};
+  if (cu && uid === cu.uid) return prof.username || storedUsername || '';
+  if (authorAvatarCache[uid]?.username) return authorAvatarCache[uid].username;
+  if (storedUsername) return storedUsername;
+  return (authorName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
 };
 
 window.getResolvedPostAuthorAvatar = function (p) {
@@ -1374,10 +1393,18 @@ async function prefetchAuthorAvatarsFromPosts(posts) {
         const prof = profileSnap.exists() ? profileSnap.data() : {};
         const ud = userSnap.exists() ? userSnap.data() : {};
         const name = prof.displayName || ud.displayName || 'User';
-        authorAvatarCache[uid] = prof.avatarUrl || ud.photoURL || uiAvatarFromName(name);
+        authorAvatarCache[uid] = {
+          avatarUrl: prof.avatarUrl || ud.photoURL || uiAvatarFromName(name),
+          displayName: name,
+          username: prof.username || ud.username || ''
+        };
       } catch {
         const sample = posts.find(p => p.authorId === uid);
-        authorAvatarCache[uid] = sample?.authorAvatar || uiAvatarFromName(sample?.authorName);
+        authorAvatarCache[uid] = {
+          avatarUrl: sample?.authorAvatar || uiAvatarFromName(sample?.authorName),
+          displayName: sample?.authorName || 'User',
+          username: sample?.authorUsername || ''
+        };
       }
     }));
   }
@@ -2335,18 +2362,19 @@ window.openExpandedPost = function (postId) {
   const timeEl = document.getElementById(prefix + '-time');
   const authorEl = document.getElementById(prefix + '-author-row');
 
-  if (avatarEl) avatarEl.src = p.authorAvatar || 'https://ui-avatars.com/api/?name=U&background=4f8ef7&color=fff';
+  if (avatarEl) avatarEl.src = window.getResolvedPostAuthorAvatar(p);
   if (timeEl) timeEl.textContent = relativeTime(p.createdAt);
   if (authorEl) {
-    const handle = p.authorUsername ||
-      (p.authorName || 'anonymous').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user';
+    const resolvedName = window.getResolvedAuthorName(p.authorId, p.authorName);
+    const resolvedUsername = window.getResolvedAuthorUsername(p.authorId, p.authorUsername, resolvedName);
+    
     authorEl.innerHTML =
       `<button class="post-author-btn"
           onclick="event.stopPropagation();openUserProfileModal('${esc(p.authorId)}')"
           style="background:none;border:none;cursor:pointer;font-family:'Syne',sans-serif;
                  display:inline-flex;align-items:center;gap:5px;padding:0">
-         <span style="font-size:.82rem;font-weight:700;color:rgba(232,234,240,.95)">${esc(p.authorName || 'Anonymous')}</span>
-         <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:rgba(174,184,210,.5)">@${esc(handle)}</span>
+         <span style="font-size:.82rem;font-weight:700;color:rgba(232,234,240,.95)">${esc(resolvedName)}</span>
+         <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:rgba(174,184,210,.5)">@${esc(resolvedUsername)}</span>
        </button>
        <span class="post-type-badge ${badgeClass}">${TYPE_BADGES[p.type] || p.type}</span>
        ${isOwn ? `<span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:rgba(174,184,210,.4);
