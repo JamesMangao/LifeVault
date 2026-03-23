@@ -1,0 +1,94 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1035"/>
+      <stop offset="100%" style="stop-color:#0d0820"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="roseGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#7c3aed" stop-opacity="0.3"/>
+      <stop offset="100%" style="stop-color:#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="subtleGlow" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="circleClip">
+      <circle cx="100" cy="100" r="94"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="100" cy="100" r="96" fill="url(#bgGrad)"/>
+  <circle cx="100" cy="100" r="95" fill="none" stroke="#7c3aed" stroke-width="0.8" opacity="0.5"/>
+  <circle cx="100" cy="100" r="91" fill="none" stroke="#7c3aed" stroke-width="0.3" opacity="0.2"/>
+
+  <!-- Ambient glow -->
+  <circle cx="100" cy="100" r="68" fill="url(#centerGlow)"/>
+
+  <!-- Subtle grid lines -->
+  <g clip-path="url(#circleClip)" opacity="0.06">
+    <line x1="0" y1="68" x2="200" y2="68" stroke="#a78bfa" stroke-width="0.6"/>
+    <line x1="0" y1="100" x2="200" y2="100" stroke="#a78bfa" stroke-width="0.6"/>
+    <line x1="0" y1="132" x2="200" y2="132" stroke="#a78bfa" stroke-width="0.6"/>
+    <line x1="68" y1="0" x2="68" y2="200" stroke="#a78bfa" stroke-width="0.6"/>
+    <line x1="100" y1="0" x2="100" y2="200" stroke="#a78bfa" stroke-width="0.6"/>
+    <line x1="132" y1="0" x2="132" y2="200" stroke="#a78bfa" stroke-width="0.6"/>
+  </g>
+
+  <!-- Chat bubble shadow layer -->
+  <rect x="32" y="52" width="122" height="86" rx="20" fill="#4c1d95" opacity="0.5"/>
+
+  <!-- Main chat bubble -->
+  <g filter="url(#subtleGlow)">
+    <rect x="28" y="48" width="122" height="86" rx="20" fill="url(#purpleGrad)"/>
+    <rect x="28" y="48" width="122" height="86" rx="20" fill="none" stroke="white" stroke-width="0.8" opacity="0.14"/>
+    <!-- Top highlight sheen -->
+    <rect x="32" y="52" width="114" height="28" rx="16" fill="white" opacity="0.05"/>
+  </g>
+
+  <!-- Bubble tail -->
+  <path d="M48 134 L36 160 L72 134Z" fill="url(#purpleGrad)"/>
+
+  <!-- Typing dots -->
+  <g filter="url(#subtleGlow)">
+    <circle cx="69" cy="91" r="8" fill="white" opacity="0.92"/>
+    <circle cx="97" cy="91" r="8" fill="white" opacity="0.92"/>
+    <circle cx="125" cy="91" r="8" fill="white" opacity="0.92"/>
+  </g>
+
+  <!-- Rose/orange AI spark -->
+  <g filter="url(#softGlow)" transform="translate(137, 44)">
+    <path d="M0,-22 L5,-5 L22,0 L5,5 L0,22 L-5,5 L-22,0 L-5,-5 Z" fill="url(#roseGrad)" opacity="0.97"/>
+    <path d="M0,-11 L2.5,-2.5 L11,0 L2.5,2.5 L0,11 L-2.5,2.5 L-11,0 L-2.5,-2.5 Z" fill="white" opacity="0.6"/>
+    <circle cx="0" cy="0" r="3.5" fill="white" opacity="0.95"/>
+  </g>
+
+  <!-- Pulse rings around spark -->
+  <circle cx="137" cy="44" r="28" fill="none" stroke="url(#roseGrad)" stroke-width="0.8" opacity="0.28"/>
+  <circle cx="137" cy="44" r="35" fill="none" stroke="#ec4899" stroke-width="0.4" opacity="0.14"/>
+
+  <!-- Accent dots -->
+  <circle cx="160" cy="30" r="2.5" fill="#ec4899" opacity="0.8"/>
+  <circle cx="168" cy="52" r="1.6" fill="#f97316" opacity="0.65"/>
+  <circle cx="146" cy="20" r="1.8" fill="#a78bfa" opacity="0.7"/>
+  <circle cx="164" cy="70" r="1.2" fill="#ec4899" opacity="0.4"/>
+
+  <!-- LifeVault heartbeat line motif at bottom -->
+  <g opacity="0.32" filter="url(#subtleGlow)">
+    <polyline
+      points="24,170 40,170 47,156 54,180 61,160 68,170 88,170"
+      fill="none" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
