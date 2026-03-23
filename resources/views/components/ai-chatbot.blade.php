@@ -179,7 +179,7 @@
 #lv-chatbot-title { display: flex; align-items: center; gap: 10px; }
 #lv-chatbot-avatar {
     width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg,#a78bfa,#ec4899);
+    background: transparent;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.1rem;
 }
@@ -361,7 +361,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: .85rem; margin-top: 2px;
 }
-.lv-chat-msg.lv-chat-ai .lv-chat-ico { background: linear-gradient(135deg,#a78bfa,#ec4899); }
+.lv-chat-msg.lv-chat-ai .lv-chat-ico { background: transparent; }
 .lv-chat-msg.lv-chat-user .lv-chat-ico { background: rgba(79,142,247,.2); color: #4f8ef7; }
 .lv-chat-meta { font-size: .62rem; color: #4a5270; padding: 2px 4px; }
 .lv-chat-user-meta { text-align: right; }
