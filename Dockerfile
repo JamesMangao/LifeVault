@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 
 # Configure Apache MPM and modules
 RUN a2dismod mpm_event mpm_worker || true \
-    && a2enmod mpm_prefork rewrite headers
+    && a2enmod rewrite headers
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
