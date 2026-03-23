@@ -462,41 +462,68 @@ async function shareToCommunity(item) {
         // Prepare content
         let shareTitle = item.title || item.summaryTitle || 'My Report';
         let shareBody = '';
-        
+
+        const TYPE_ICONS = { 'resume': '📄', 'holistic-career': '🔮', 'story': '📖', 'shadow': '🪞' };
+        const typeIcon = TYPE_ICONS[item.type] || '🔖';
+
         if (item.type === 'story') {
             const SM = {memoir:'Memoir', literary:'Literary', poetic:'Poetic', cinematic:'Cinematic', epistolary:'Epistolary', stream:'Stream', mythic:'Mythic', detective:'Self-Discovery'};
             const RL = {last7:'Last 7 Days', last30:'Last 30 Days', last90:'Last 3 Months', all:'All Time'};
-            shareBody = `**Style:** ${SM[item.style] || item.style || 'Standard'}\n` +
-                        `**Range:** ${RL[item.range] || 'All'}\n` +
-                        `**Themes:** ${(item.themes || []).join(', ')}\n\n` +
-                        (item.body || '');
+            const themes = (item.themes || []).slice(0, 4).map(t => `\`${t}\``).join(' · ');
+            const preview = (item.body || '').trim().slice(0, 600);
+            const hasMore = (item.body || '').length > 600;
+            shareBody = [
+                themes ? `*${SM[item.style] || 'Story'} · ${RL[item.range] || 'All Time'} · ${themes}*` : `*${SM[item.style] || 'Story'} · ${RL[item.range] || 'All Time'}*`,
+                '',
+                preview + (hasMore ? '…' : '')
+            ].join('\n');
+
         } else if (item.type === 'shadow') {
-            shareBody = `**Awareness Score:** ${item.awarenessScore || 0}%\n\n` +
-                        (item.summaryText || '') + '\n\n' +
-                        '**--- DETECTED PATTERNS ---**\n' +
-                        (item.patterns || []).map(p => `${p.emoji || '🎭'} **${p.name}** (${p.severity || 1}/5)\n${p.description || ''}`).join('\n\n') +
-                        '\n\n**--- COMPASSIONATE REFRAMES ---**\n' +
-                        (item.reframes || []).map(r => `*Shadow:* "${r.shadow}"\n*Truth:* ${r.reframe}`).join('\n\n') +
-                        '\n\n**--- HIDDEN STRENGTHS ---**\n' +
-                        (item.strengths || []).join(', ');
+            const score = item.awarenessScore || 0;
+            const scoreLbl = score >= 75 ? 'High Awareness' : score >= 50 ? 'Growing Awareness' : 'Early Awareness';
+            const topPatterns = (item.patterns || []).slice(0, 4).map(p => `${p.emoji || '🎭'} **${p.name}**`).join('  ·  ');
+            const topStrengths = (item.strengths || []).slice(0, 3).join(', ');
+            const summary = (item.summaryText || '').trim().slice(0, 300);
+            const parts = [
+                `**🪞 Shadow Self Analysis** · **${score}% Awareness** · *${scoreLbl}*`,
+                '',
+            ];
+            if (summary) parts.push('> ' + summary.split('\n').join('\n> '), '');
+            if (topPatterns) parts.push(`**Patterns detected:** ${topPatterns}`, '');
+            if (topStrengths) parts.push(`**Hidden strengths:** ${topStrengths}`);
+            shareBody = parts.join('\n');
+
         } else if (item.type === 'resume' || item.type === 'holistic-career') {
             const s = item.score || 0;
-            const lbl = item.type === 'holistic-career'
-              ? (s >= 80 ? 'Highly Aligned' : s >= 60 ? 'Moderately Aligned' : s >= 40 ? 'Partially Aligned' : 'Misaligned')
-              : (s >= 75 ? 'Strong Match' : s >= 50 ? 'Moderate Match' : 'Needs Work');
-            
-            shareBody = `**Score:** ${s}/100\n` +
-                        `**Analysis:** ${lbl}\n\n` +
-                        (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim();
+            const isHolistic = item.type === 'holistic-career';
+            const lbl = isHolistic
+              ? (s >= 80 ? 'Highly Aligned ✨' : s >= 60 ? 'Moderately Aligned' : s >= 40 ? 'Partially Aligned' : 'Misaligned')
+              : (s >= 75 ? 'Strong Match ✨' : s >= 50 ? 'Moderate Match' : 'Needs Work');
+            const icon = isHolistic ? '🔮' : '📄';
+            // Extract first meaningful paragraph from the report
+            const rawText = (item.markdown || item.content || '')
+                .replace(/#{1,3} .+\n?/g, '')
+                .replace(/\*\*/g, '')
+                .replace(/\*/g, '')
+                .trim();
+            const firstPara = rawText.split(/\n\n+/).find(p => p.trim().length > 60) || '';
+            const preview = firstPara.trim().slice(0, 400);
+
+            shareBody = [
+                `**${icon} Score: ${s}/100** · *${lbl}*`,
+                '',
+                preview ? '> ' + preview : '',
+            ].filter(Boolean).join('\n');
         } else {
-            shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim();
+            shareBody = (item.markdown || item.content || '').replace(/#{1,3} .+\n?/g, '').trim().slice(0, 600);
         }
 
         await addDoc(collection(window.db, 'community_posts'), {
           type: 'thought',
-          title: 'Shared ' + (item.type.charAt(0).toUpperCase() + item.type.slice(1).replace('-',' ')) + ': ' + shareTitle,
+          title: shareTitle,
           body: shareBody,
           authorId: currentUser.uid,
+
           authorName,
           authorAvatar,
           authorUsername: p.username || (authorName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || 'user'),
