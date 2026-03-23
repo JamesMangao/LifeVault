@@ -1625,7 +1625,10 @@ function renderPostCard(p) {
       ${p.body ? `<div class="post-body">${esc(p.body)}</div>` : ''}`;
   } else {
     const isLong = (p.body || '').length > 300;
-    typeHtml = `<div class="post-body" id="post-body-${p.id}" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${esc(p.body || '')}</div>
+    const bodyRendered = p.isSharedItem && typeof marked !== 'undefined'
+      ? marked.parse(p.body || '')
+      : esc(p.body || '');
+    typeHtml = `<div class="post-body ${p.isSharedItem ? 'markdown-content' : ''}" id="post-body-${p.id}" style="display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden">${bodyRendered}</div>
       ${isLong ? `<span class="post-read-more" onclick="event.stopPropagation();toggleReadMore('${p.id}')" style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--accent);cursor:pointer;margin-top:4px;display:inline-block">Read more ↓</span>` : ''}
       ${p.moodEmoji ? `<div style="margin-top:8px;font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace">feeling ${p.moodEmoji}</div>` : ''}
       ${p.photoUrls?.length ? `<div class="post-photos">${p.photoUrls.map(u => `<img src="${u}" class="post-photo" onclick="event.stopPropagation();viewPhoto('${u}')">`).join('')}</div>` : ''}
@@ -1683,16 +1686,25 @@ window.toggleLike = async postId => {
 };
 
 window.deletePost = async postId => {
-  if (!confirm('Delete this post?')) return;
-  try {
-    await deleteDoc(doc(db, 'community_posts', postId));
-    feedPosts = feedPosts.filter(p => p.id !== postId);
-    window.feedPosts = feedPosts;
-    if (typeof window.closeExpandedPost === 'function') window.closeExpandedPost();
-    if (typeof window.renderFeed === 'function') window.renderFeed();
-    else renderFeed();
-    toast('Post deleted', '🗑️');
-  } catch (e) { toast('Error: ' + e.message, '❌'); }
+  window.confirmAction({
+    emoji: '🗑️',
+    title: 'Delete Post?',
+    body: 'This will permanently remove this post from the community feed. This action cannot be undone.',
+    confirm: 'Delete',
+    danger: true,
+    onConfirm: async (close) => {
+      try {
+        await deleteDoc(doc(db, 'community_posts', postId));
+        feedPosts = feedPosts.filter(p => p.id !== postId);
+        window.feedPosts = feedPosts;
+        if (typeof window.closeExpandedPost === 'function') window.closeExpandedPost();
+        if (typeof window.renderFeed === 'function') window.renderFeed();
+        else renderFeed();
+        toast('Post deleted', '🗑️');
+      } catch (e) { toast('Error: ' + e.message, '❌'); }
+      close();
+    }
+  });
 };
 
 window.toggleComments = async postId => {
@@ -2418,9 +2430,14 @@ window.openExpandedPost = function (postId) {
       bodyHtml += `<div style="margin-bottom:12px;font-size:.8rem;font-family:'JetBrains Mono',monospace;
                                 color:rgba(174,184,210,.45)">feeling ${p.moodEmoji}</div>`;
     }
-    bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;
+    if (p.isSharedItem && typeof marked !== 'undefined') {
+      bodyHtml += `<div class="markdown-content" style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;color:rgba(232,234,240,.8);font-weight:300;word-break:break-word">${marked.parse(p.body || '')}</div>`;
+    } else {
+      bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;
                               color:rgba(232,234,240,.8);font-weight:300;
                               white-space:pre-wrap;word-break:break-word">${esc(p.body || '')}</div>`;
+    }
+
     if (p.photoUrls?.length) {
       bodyHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">
         ${p.photoUrls.map(u =>
