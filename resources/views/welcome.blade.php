@@ -217,25 +217,33 @@
         </div>
         <div id="lv-chatbot-messages"></div>
         <div id="lv-chatbot-faqs">
-            <div class="lv-faq-track lv-track-left" style="animation-duration:25s">
-                <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
+            <div class="lv-faq-marquee">
+                <div class="lv-faq-track lv-track-left">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
+                </div>
+                <div class="lv-faq-track lv-track-left" aria-hidden="true">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is LifeVault?')">What is LifeVault?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is my data private?')">Is my data private?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How does Shadow Work help?')">How does Shadow Work help?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Can I analyze my resume?')">Can I analyze my resume?</button>
+                </div>
             </div>
-            <div class="lv-faq-track lv-track-right" style="animation-duration:20s">
-                <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
-                <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
+            <div class="lv-faq-marquee">
+                <div class="lv-faq-track lv-track-right">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
+                </div>
+                <div class="lv-faq-track lv-track-right" aria-hidden="true">
+                    <button class="lv-faq-item" onclick="lvSendFAQ('What is the Life Story tool?')">What is the Life Story tool?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('How to start journaling?')">How to start journaling?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Is it really free?')">Is it really free?</button>
+                    <button class="lv-faq-item" onclick="lvSendFAQ('Who is Sentinel?')">Who is Sentinel?</button>
+                </div>
             </div>
         </div>
         <div id="lv-chatbot-input-area">
@@ -847,11 +855,12 @@ body.fx-glow .lv-card:hover {
 #lv-chatbot-messages::-webkit-scrollbar-thumb{background:rgba(124,58,237,.3);border-radius:99px}
 #lv-chatbot-faqs{overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);background:rgba(124,58,237,.03);flex-shrink:0}
 #lv-chatbot-faqs:hover .lv-faq-track{animation-play-state:paused}
-.lv-faq-track{display:flex!important;flex-direction:row;gap:10px;padding:0 12px;white-space:nowrap;will-change:transform;height:32px;align-items:center}
-.lv-track-left{animation:lv-faq-left linear infinite}
-.lv-track-right{animation:lv-faq-right linear infinite}
-@keyframes lv-faq-left{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-@keyframes lv-faq-right{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
+.lv-faq-marquee{display:flex;overflow:hidden;gap:10px;padding:0 12px;width:100%}
+.lv-faq-track{display:flex;flex-shrink:0;flex-direction:row;gap:10px;white-space:nowrap;will-change:transform;height:32px;align-items:center}
+.lv-track-left{animation:lv-faq-left 12s linear infinite}
+.lv-track-right{animation:lv-faq-right 10s linear infinite}
+@keyframes lv-faq-left{from{transform:translateX(0)}to{transform:translateX(calc(-100% - 10px))}}
+@keyframes lv-faq-right{from{transform:translateX(calc(-100% - 10px))}to{transform:translateX(0)}}
 .lv-faq-item{flex-shrink:0;display:inline-block;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);border-radius:20px;padding:5px 14px;color:#c4b5fd;font-size:.71rem;font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;white-space:nowrap;line-height:1.6;transition:background .18s,border-color .18s,color .18s,transform .15s}
 .lv-faq-item:hover{background:rgba(124,58,237,.25);border-color:rgba(167,139,250,.6);color:#fff;transform:translateY(-1px)}
 .lv-chat-msg{display:flex;gap:8px;animation:lv-fadeup .25s ease}
