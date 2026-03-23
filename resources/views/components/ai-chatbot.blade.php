@@ -383,6 +383,8 @@
     var _chatOpen    = false;
     var _chatHistory = [];
     var _isTyping    = false;
+    var _userName    = "{{ Auth::check() ? Auth::user()->name : '' }}";
+    var _isLoggedIn  = {{ Auth::check() ? 'true' : 'false' }};
 
     var fab      = document.getElementById('lv-chat-fab');
     var overlay  = document.getElementById('lv-chatbot-overlay');
@@ -428,6 +430,11 @@ CORE TOOLS & FEATURES:
 PRIVACY & VALUES:
 - End-to-end encrypted — your data is never sold.
 - Free to start — always. Sign in with Google.
+
+CURRENT USER CONTEXT:
+- User is: ` + (_isLoggedIn ? 'LOGGED IN as ' + _userName : 'NOT LOGGED IN (Guest)') + `
+- If logged in, you can reference their journey and encourage exploring their features.
+- If not logged in, emphasize that signing in with Google unlocks the AI analyzers (Shadow Self, Life Story, etc.) which need journal data to work.
 
 YOUR PERSONALITY:
 - Warm, insightful, encouraging.
@@ -520,7 +527,12 @@ YOUR PERSONALITY:
     /* ── welcome message ── */
     function seedWelcome() {
         if (!messages || messages.children.length) return;
-        appendAI("Hi! I'm **LifeVault AI** ✨\n\nI can help with journaling tips, shadow work, career advice, or explain everything LifeVault can do for you.\n\nWhat's on your mind?");
+        var greeting = "Hi" + (_userName ? " " + _userName.split(' ')[0] : "") + "! I'm **LifeVault AI** ✨";
+        if (!_isLoggedIn) {
+            appendAI(greeting + "\n\nI can help with journaling tips or explain how LifeVault works. **Sign in** to unlock your personal AI Shadow Self and Life Story reports!");
+        } else {
+            appendAI(greeting + "\n\nI can help with journaling tips, shadow work, career advice, or explain any feature. How's your journey going today?");
+        }
     }
 
     /* ── toggle open/close ── */
