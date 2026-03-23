@@ -2,8 +2,7 @@
      FLOATING AI CHAT BUTTON
 ════════════════════════════════════════════ --}}
 <button id="lv-chat-fab" onclick="lvToggleChatbot()" title="Chat with LifeVault AI">
-    <span id="lv-chat-fab-icon">🤖</span>
-    <span class="lv-chat-fab-text">Ask AI</span>
+    <span id="lv-chat-fab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c-4 0-7-3-7-7 0 4-3 7-7 7 4 0 7 3 7 7 0-4 3-7 7-7Z" fill="currentColor"></path><path d="M20 5c-1.5 0-2.5-1-2.5-2.5 0 1.5-1 2.5-2.5 2.5 1.5 0 2.5 1 2.5 2.5 0-1.5 1-2.5 2.5-2.5Z" fill="currentColor"></path><path d="M6 19c-1 0-2-1-2-2 0 1-1 2-2 2 1 0 2 1 2 2 0-1 1-2 2-2Z" fill="currentColor"></path></svg></span>
 </button>
 
 {{-- ════════════════════════════════════════════
@@ -15,7 +14,7 @@
         <!-- HEADER -->
         <div id="lv-chatbot-header">
             <div id="lv-chatbot-title">
-                <div id="lv-chatbot-avatar">🤖</div>
+                <div id="lv-chatbot-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c-4 0-7-3-7-7 0 4-3 7-7 7 4 0 7 3 7 7 0-4 3-7 7-7Z" fill="currentColor"></path><path d="M20 5c-1.5 0-2.5-1-2.5-2.5 0 1.5-1 2.5-2.5 2.5 1.5 0 2.5 1 2.5 2.5 0-1.5 1-2.5 2.5-2.5Z" fill="currentColor"></path><path d="M6 19c-1 0-2-1-2-2 0 1-1 2-2 2 1 0 2 1 2 2 0-1 1-2 2-2Z" fill="currentColor"></path></svg></div>
                 <div>
                     <div style="font-weight:700;font-size:.95rem;background:linear-gradient(135deg,#a78bfa,#4f8ef7);-webkit-background-clip:text;-webkit-text-fill-color:transparent">LifeVault AI</div>
                     <div style="font-size:.65rem;color:#4a5270;font-family:'JetBrains Mono',monospace;margin-top:1px">● Online</div>
@@ -84,11 +83,11 @@
     bottom: 32px; right: 32px;
     z-index: 500;
     height: 58px; width: 58px; 
-    border-radius: 29px; border: none; cursor: pointer;
+    border-radius: 50%; border: none; cursor: pointer;
     background: linear-gradient(135deg, #7c3aed, #4f8ef7);
     color: white;
     box-shadow: 0 8px 32px rgba(124,58,237,.5);
-    display: flex; align-items: center; justify-content: flex-start;
+    display: flex; align-items: center; justify-content: center;
     font-size: 1.5rem;
     transition: all .35s cubic-bezier(.34,1.56,.64,1);
     overflow: hidden; padding: 0;
@@ -110,8 +109,7 @@
 }
 
 #lv-chat-fab:hover {
-    width: 140px;
-    transform: translateY(-3px);
+    transform: scale(1.1) translateY(-3px);
     box-shadow: 0 14px 40px rgba(124,58,237,.65), 0 0 0 8px rgba(124,58,237,.1);
     animation: none;
 }
@@ -123,29 +121,12 @@
     transition: transform 0.3s;
 }
 
-.lv-chat-fab-text {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700; font-size: 1.05rem;
-    white-space: nowrap;
-    opacity: 0; transform: translateX(-10px);
-    transition: all 0.3s cubic-bezier(.34,1.56,.64,1);
-}
-
-#lv-chat-fab:hover .lv-chat-fab-text {
-    opacity: 1; transform: translateX(0);
-}
-
-#lv-chat-fab:hover #lv-chat-fab-icon {
-    transform: scale(1.1) rotate(-10deg);
-}
-
 #lv-chat-fab:active { transform: scale(.95); }
 #lv-chat-fab.lv-chat-open { 
     background: linear-gradient(135deg,#4b5563,#374151); 
     width: 58px; border-radius: 50%;
     animation: none;
 }
-#lv-chat-fab.lv-chat-open .lv-chat-fab-text { display: none; }
 #lv-chat-fab.lv-chat-open #lv-chat-fab-icon { transform: rotate(90deg) scale(0.9); }
 
 /* ══════════════════════ OVERLAY ══════════════════════ */
@@ -526,7 +507,7 @@ YOUR PERSONALITY:
 
         var ico = document.createElement('div');
         ico.className = 'lv-chat-ico';
-        ico.textContent = '🤖';
+        ico.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c-4 0-7-3-7-7 0 4-3 7-7 7 4 0 7 3 7 7 0-4 3-7 7-7Z" fill="currentColor"></path><path d="M20 5c-1.5 0-2.5-1-2.5-2.5 0 1.5-1 2.5-2.5 2.5 1.5 0 2.5 1 2.5 2.5 0-1.5 1-2.5 2.5-2.5Z" fill="currentColor"></path><path d="M6 19c-1 0-2-1-2-2 0 1-1 2-2 2 1 0 2 1 2 2 0-1 1-2 2-2Z" fill="currentColor"></path></svg>';
 
         var bubble = document.createElement('div');
         bubble.className = 'lv-chat-bubble';
@@ -596,7 +577,7 @@ YOUR PERSONALITY:
         _chatOpen = !_chatOpen;
         overlay.classList.toggle('lv-chat-visible', _chatOpen);
         fab.classList.toggle('lv-chat-open', _chatOpen);
-        document.getElementById('lv-chat-fab-icon').textContent = _chatOpen ? '✕' : '🤖';
+        document.getElementById('lv-chat-fab-icon').innerHTML = _chatOpen ? '✕' : '<svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c-4 0-7-3-7-7 0 4-3 7-7 7 4 0 7 3 7 7 0-4 3-7 7-7Z" fill="currentColor"></path><path d="M20 5c-1.5 0-2.5-1-2.5-2.5 0 1.5-1 2.5-2.5 2.5 1.5 0 2.5 1 2.5 2.5 0-1.5 1-2.5 2.5-2.5Z" fill="currentColor"></path><path d="M6 19c-1 0-2-1-2-2 0 1-1 2-2 2 1 0 2 1 2 2 0-1 1-2 2-2Z" fill="currentColor"></path></svg>';
         if (_chatOpen) {
             seedWelcome();
             setTimeout(function () { input && input.focus(); }, 350);
