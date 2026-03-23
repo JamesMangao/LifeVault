@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Forcefully disable all MPMs and only enable prefork
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf \
+# Configure Apache MPM and modules
+RUN a2dismod mpm_event mpm_worker || true \
     && a2enmod mpm_prefork rewrite headers
 
 # Install Composer
