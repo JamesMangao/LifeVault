@@ -81,21 +81,6 @@
 
   </div>
 
-  {{-- ── 7-Day Mood Trend ── --}}
-  <div class="ins-card" style="margin-top:18px">
-    <div class="ins-card-title">
-      <span class="ins-card-icon">🌊</span>
-      7-Day Mood Trend
-    </div>
-    <div class="ins-trend-wrap" id="mood-trend-chart">
-      <div class="ins-empty-state" id="ins-trend-empty">
-        <div class="ins-empty-icon">📭</div>
-        <div class="ins-empty-text">No mood data yet.</div>
-        <div class="ins-empty-sub">Start journaling with a mood to see your trend here.</div>
-      </div>
-      <canvas id="ins-mood-canvas" style="display:none;width:100%;height:160px"></canvas>
-    </div>
-  </div>
 
   {{-- ── Bottom Row: Writing Frequency + Mood Distribution ── --}}
   <div class="ins-grid-2" style="margin-top:18px">

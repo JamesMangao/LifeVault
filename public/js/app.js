@@ -2431,7 +2431,8 @@ window.openExpandedPost = function (postId) {
                                 color:rgba(174,184,210,.45)">feeling ${p.moodEmoji}</div>`;
     }
     if (p.isSharedItem && typeof marked !== 'undefined') {
-      bodyHtml += `<div class="markdown-content" style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;color:rgba(232,234,240,.8);font-weight:300;word-break:break-word">${marked.parse(p.body || '')}</div>`;
+      const expandedContent = p.fullBody || p.body || '';
+      bodyHtml += `<div class="markdown-content" style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;color:rgba(232,234,240,.8);font-weight:300;word-break:break-word">${marked.parse(expandedContent)}</div>`;
     } else {
       bodyHtml += `<div style="font-family:'Newsreader',serif;font-size:1rem;line-height:1.9;
                               color:rgba(232,234,240,.8);font-weight:300;
