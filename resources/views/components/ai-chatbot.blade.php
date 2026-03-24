@@ -2,7 +2,7 @@
      FLOATING AI CHAT BUTTON
 ════════════════════════════════════════════ --}}
 <button id="lv-chat-fab" onclick="lvToggleChatbot()" title="Chat with LifeVault AI">
-    <span id="lv-chat-fab-icon"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:24px;height:24px;border-radius:6px;object-fit:cover;"></span>
+    <span id="lv-chat-fab-icon"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:40px;height:40px;border-radius:10px;object-fit:cover;"></span>
 </button>
 
 {{-- ═══════════════════════════════════════════
@@ -14,7 +14,7 @@
         <!-- HEADER -->
         <div id="lv-chatbot-header">
             <div id="lv-chatbot-title">
-                <div id="lv-chatbot-avatar"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:32px;height:32px;border-radius:8px;object-fit:cover;"></div>
+                <div id="lv-chatbot-avatar"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:48px;height:48px;border-radius:12px;object-fit:cover;"></div>
                 <div>
                     <div style="font-weight:700;font-size:.95rem;background:linear-gradient(135deg,#a78bfa,#4f8ef7);-webkit-background-clip:text;-webkit-text-fill-color:transparent">LifeVault AI</div>
                     <div style="font-size:.65rem;color:#4a5270;font-family:'JetBrains Mono',monospace;margin-top:1px">● Online</div>
@@ -577,7 +577,7 @@ YOUR PERSONALITY:
         _chatOpen = !_chatOpen;
         overlay.classList.toggle('lv-chat-visible', _chatOpen);
         fab.classList.toggle('lv-chat-open', _chatOpen);
-        document.getElementById('lv-chat-fab-icon').innerHTML = _chatOpen ? '✕' : '<img src="/logo.svg" alt="AI" style="width:24px;height:24px;border-radius:6px;object-fit:cover;">';
+        document.getElementById('lv-chat-fab-icon').innerHTML = _chatOpen ? '✕' : '<img src="/logo.svg" alt="AI" style="width:40px;height:40px;border-radius:10px;object-fit:cover;">';
         if (_chatOpen) {
             seedWelcome();
             setTimeout(function () { input && input.focus(); }, 350);
