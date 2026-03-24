@@ -2,7 +2,7 @@
      FLOATING AI CHAT BUTTON
 ════════════════════════════════════════════ --}}
 <button id="lv-chat-fab" onclick="lvToggleChatbot()" title="Chat with LifeVault AI">
-    <span id="lv-chat-fab-icon"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;"></span>
+    <span id="lv-chat-fab-icon" style="background:transparent;"><img src="{{ asset('logo.svg') }}" alt="AI" style="width:36px;height:36px;border-radius:50%;object-fit:contain;display:block;min-width:36px;min-height:36px;"></span>
 </button>
 
 {{-- ═══════════════════════════════════════════
@@ -81,7 +81,7 @@
 #lv-chat-fab {
     position: fixed;
     bottom: 32px; right: 32px;
-    z-index: 9999;
+    z-index: 2147483647;
     height: 58px; width: 58px; 
     border-radius: 50%; border: none; cursor: pointer;
     background: linear-gradient(135deg, #7c3aed, #4f8ef7);
@@ -577,7 +577,7 @@ YOUR PERSONALITY:
         _chatOpen = !_chatOpen;
         overlay.classList.toggle('lv-chat-visible', _chatOpen);
         fab.classList.toggle('lv-chat-open', _chatOpen);
-        document.getElementById('lv-chat-fab-icon').innerHTML = _chatOpen ? '✕' : '<img src="/logo.svg" alt="AI" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;">';
+        document.getElementById('lv-chat-fab-icon').innerHTML = _chatOpen ? '✕' : '<img src="/logo.svg" alt="AI" style="width:36px;height:36px;border-radius:50%;object-fit:contain;display:block;min-width:36px;min-height:36px;">';
         if (_chatOpen) {
             seedWelcome();
             setTimeout(function () { input && input.focus(); }, 350);
