@@ -12,32 +12,29 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::middleware(['web'])->group(function () {
-    // ── Resume Analysis ───────────────────────────────────────────
-    Route::post('/analyze-ajax', [ResumeAnalysisController::class, 'storeAjax'])
-        ->name('analyze.resume.ajax');
+// ── Resume Analysis ───────────────────────────────────────────
+Route::post('/analyze-ajax', [ResumeAnalysisController::class, 'storeAjax'])
+    ->name('analyze.resume.ajax');
 
 Route::post('/resume/download-docx', [ResumeAnalysisController::class, 'downloadDocx'])
     ->name('resume.download.docx');
 
+// ── Life Story AI ─────────────────────────────────────────────
+Route::post('/ai/life-story/generate', [LifeStoryAIController::class, 'generate'])
+    ->name('ai.life-story.generate');
 
-    // ── Life Story AI ─────────────────────────────────────────────
-    Route::post('/ai/life-story/generate', [LifeStoryAIController::class, 'generate'])
-        ->name('ai.life-story.generate');
+Route::get('/ai/life-story/models', [LifeStoryAIController::class, 'models'])
+    ->name('ai.life-story.models');
 
-    Route::get('/ai/life-story/models', [LifeStoryAIController::class, 'models'])
-        ->name('ai.life-story.models');
+// ── Shadow Self AI ────────────────────────────────────────────
+Route::post('/ai/shadow-self/analyze', [ShadowSelfAIController::class, 'analyzeShadowSelf'])
+    ->name('ai.shadow-self.analyze');
 
-    // ── Shadow Self AI ────────────────────────────────────────────
-    Route::post('/ai/shadow-self/analyze', [ShadowSelfAIController::class, 'analyzeShadowSelf'])
-        ->name('ai.shadow-self.analyze');
+Route::post('/ai/holistic-career/analyze', [HolisticCareerAdvisorController::class, 'analyze'])
+     ->name('ai.holistic-career.analyze');
 
-    Route::post('/ai/holistic-career/analyze', [HolisticCareerAdvisorController::class, 'analyze'])
-         ->name('ai.holistic-career.analyze');
-
-    Route::post('/notifications/mention', [NotificationController::class, 'sendMentionNotification'])
-         ->name('notifications.mention');
-});
+Route::post('/notifications/mention', [NotificationController::class, 'sendMentionNotification'])
+     ->name('notifications.mention');
 
 // ── AI Chat API ──────────────────────────────────────────────
 Route::post('/api/chat', function (\Illuminate\Http\Request $request) {
@@ -48,7 +45,7 @@ Route::post('/api/chat', function (\Illuminate\Http\Request $request) {
     ])->post('https://openrouter.ai/api/v1/chat/completions', $request->all());
 
     return $response->json();
-})->middleware('web');
+});
 
 Route::get('/insights', function () {
     return view('insights');
