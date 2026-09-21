@@ -16,11 +16,11 @@ class HolisticCareerAdvisorController extends Controller
      * OpenRouter free models end with ":free".
      */
     private const MODELS = [
-        'mistralai/mistral-7b-instruct:free',
-        'google/gemma-3-12b-it:free',
-        'microsoft/phi-3-mini-128k-instruct:free',
-        'qwen/qwen3-8b:free',
-        'deepseek/deepseek-r1-0528:free',
+        'nex-agi/nex-n2.5-pro:free',
+        'nvidia/nemotron-3-super-120b-a12b:free',
+        'nvidia/nemotron-3-ultra-550b-a55b:free',
+        'google/gemma-4-31b-it:free',
+        'qwen/qwen3.8-27b:free',
         'openai/gpt-4o-mini',
     ];
 

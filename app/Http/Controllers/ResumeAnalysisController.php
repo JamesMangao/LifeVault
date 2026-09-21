@@ -207,7 +207,7 @@ PROMPT;
                     'Authorization' => 'Bearer ' . $apiKey,
                     'Content-Type'  => 'application/json',
                 ])->timeout(60)->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model'       => 'llama-3.3-70b-versatile',
+                    'model'       => 'qwen/qwen3.8-27b',
                     'max_tokens'  => 2048,
                     'temperature' => 0,
                     'messages'    => [
@@ -311,19 +311,23 @@ PROMPT;
      */
     private function extractTextViaTesseract(string $pdfPath): string
     {
-        // Read paths from .env
-        $tesseractBin = env('TESSERACT_PATH', 'tesseract');
-        $pdftoppmBin  = env('PDFTOPPM_PATH',  'pdftoppm');
+        // Read paths from .env (defaults to Linux system binaries)
+        $tesseractBin = env('TESSERACT_PATH', '/usr/bin/tesseract');
+        $pdftoppmBin  = env('PDFTOPPM_PATH',  '/usr/bin/pdftoppm');
 
-        // Verify both binaries exist
-        if (!file_exists($tesseractBin)) {
-            Log::error('Tesseract binary not found at: ' . $tesseractBin);
-            return '';
+        // Verify binaries exist if explicit path given
+        if (str_contains($tesseractBin, '/') || str_contains($tesseractBin, '\\')) {
+            if (!file_exists($tesseractBin)) {
+                // Fallback to checking if available globally
+                $tesseractBin = trim(shell_exec('which tesseract 2>/dev/null') ?: $tesseractBin);
+            }
         }
 
-        if (!file_exists($pdftoppmBin)) {
-            Log::error('pdftoppm binary not found at: ' . $pdftoppmBin);
-            return '';
+        if (str_contains($pdftoppmBin, '/') || str_contains($pdftoppmBin, '\\')) {
+            if (!file_exists($pdftoppmBin)) {
+                // Fallback to checking if available globally
+                $pdftoppmBin = trim(shell_exec('which pdftoppm 2>/dev/null') ?: $pdftoppmBin);
+            }
         }
 
         // Create isolated temp working directory

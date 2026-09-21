@@ -4,7 +4,7 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-blue.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com)
 [![Firebase Integrated](https://img.shields.io/badge/Firebase-Firestore-amber.svg?style=flat-square&logo=firebase)](https://firebase.google.com)
 [![Docker Support](https://img.shields.io/badge/Docker-Enabled-cyan.svg?style=flat-square&logo=docker)](https://www.docker.com)
-[![LLM Integrations](https://img.shields.io/badge/AI-OpenRouter%20%7C%20Groq%20%7C%20Cerebras-purple.svg?style=flat-square)](https://openrouter.ai)
+[![LLM Integrations](https://img.shields.io/badge/AI-OpenRouter%20%7C%20Groq%20%7C%20Cerebras-purple.svg?style=flat-square)](https://cloud.cerebras.ai)
 
 > **LifeVault** is a secure, premium web application designed for deep personal reflection, self-discovery, and professional alignment. Combining standard journaling, mood tracking, and task management with state-of-the-art AI analysis, LifeVault serves as your personal vault and growth mentor.
 
@@ -18,7 +18,7 @@ The foundation of LifeVault. Securely capture your raw daily thoughts, emotions,
 ### 📄 Resume Analyzer
 Upload your resume (`.pdf`, `.docx`, `.doc`, `.txt`) along with a job description. LifeVault will:
 - Extract text directly (falling back to **Tesseract OCR via pdftoppm** for image-based PDFs).
-- Connect to **Cerebras AI** (Llama-3.1-8b) to produce a detailed ATS optimization suggestions report.
+- Connect to **Groq / Cerebras AI** high-throughput inference to produce a detailed ATS optimization suggestions report.
 - Deliver an ATS match score, keyword recommendations, quick wins, and section-by-section rewrites.
 - Allow downloading the entire AI-optimized feedback report as a styled `.docx` file.
 

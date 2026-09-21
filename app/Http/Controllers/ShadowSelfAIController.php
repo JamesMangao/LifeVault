@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 class ShadowSelfAIController extends Controller
 {
     // ── Groq API config ───────────────────────────────────────────────────────
-    private const GROQ_MODEL = 'llama-3.3-70b-versatile';
+    private const GROQ_MODEL = 'qwen/qwen3.8-27b';
     private const GROQ_API   = 'https://api.groq.com/openai/v1/chat/completions';
 
     // ──────────────────────────────────────────────────────────────────────────

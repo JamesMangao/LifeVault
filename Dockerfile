@@ -65,4 +65,4 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf \
 EXPOSE 8080
 
 # Start Apache
-CMD ["sh", "-c", "a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork && exec apache2-foreground"]
+CMD ["apache2-foreground"]
