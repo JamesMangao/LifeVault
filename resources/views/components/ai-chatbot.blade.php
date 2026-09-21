@@ -612,7 +612,7 @@ YOUR PERSONALITY:
                 'X-Title': 'LifeVault'
             },
             body: JSON.stringify({
-                model: 'anthropic/claude-3.5-haiku',
+                model: 'nex-agi/nex-n2.5-pro:free',
                 max_tokens: 800,
                 stream: true,
                 messages: [{ role: 'system', content: SYSTEM_PROMPT }].concat(_chatHistory)
